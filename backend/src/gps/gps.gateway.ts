@@ -21,7 +21,8 @@ export class GpsGateway {
       if (!user || !user.isActive) return client.disconnect(true);
 
       client.data.user = { id: user.id, role: user.role, teamId: user.teamId };
-      if ([UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR].includes(user.role)) {
+      const managementRoles: UserRole[] = [UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR];
+      if (managementRoles.includes(user.role)) {
         await client.join('gps-management');
       }
     } catch {
