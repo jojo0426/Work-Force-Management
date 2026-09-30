@@ -1,6 +1,6 @@
-import { BadRequestException, Controller, Post, Get, Query, Param, Body, UploadedFile, UseInterceptors, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException, Controller, ForbiddenException, NotFoundException, Post, Get, Query, Param, Body, UploadedFile, UseInterceptors, UseGuards, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UserRole } from '@prisma/client';
+import { UserRole, WoStatus } from '@prisma/client';
 import { WorkOrdersService } from './work-orders.service';
 import { WorkOrdersPhase2Service } from './work-orders-phase2.service';
 import { PrismaService } from '../prisma.service';
@@ -24,9 +24,7 @@ export class WorkOrdersController {
 
   @Post('import-preview')
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
-  async importPreview(@Body() body: any) {
-    return this.svc.prepareImportPreview(body.workOrders);
-  }
+  async importPreview(@Body() body: any) { return this.svc.prepareImportPreview(body.workOrders); }
 
   @Post('confirm')
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
@@ -38,10 +36,46 @@ export class WorkOrdersController {
 
   @Get()
   @Roles(UserRole.TECHNICIAN, UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
-  async list(@Query('status') status?: string) {
-    const where: any = {}; if (status) where.status = status;
-    const data = await this.prisma.workOrder.findMany({ where, take: 100, orderBy: { createdAt: 'desc' } });
+  async list(@Req() req: any, @Query('status') status?: string) {
+    const where: any = {};
+    if (status) where.status = status;
+    if (req.user.role === UserRole.TECHNICIAN) {
+      const technician = await this.prisma.user.findUnique({ where: { id: req.user.id }, select: { teamId: true, isActive: true } });
+      if (!technician?.isActive) throw new ForbiddenException('Technician account is inactive');
+      if (!technician.teamId) return { data: [] };
+      where.assignments = { some: { teamId: technician.teamId } };
+      where.status = status || { in: [WoStatus.ASSIGNED, WoStatus.WORKING] };
+    }
+    const data = await this.prisma.workOrder.findMany({
+      where,
+      include: { assignments: true },
+      take: 100,
+      orderBy: { createdAt: 'desc' }
+    });
     return { data };
+  }
+
+  @Post(':id/start')
+  @Roles(UserRole.TECHNICIAN)
+  async startWork(@Req() req: any, @Param('id') id: string) {
+    const technician = await this.prisma.user.findUnique({ where: { id: req.user.id }, select: { id: true, teamId: true, isActive: true } });
+    if (!technician?.isActive) throw new ForbiddenException('Technician account is inactive');
+    if (!technician.teamId) throw new ForbiddenException('Technician is not assigned to a team');
+
+    const workOrder = await this.prisma.workOrder.findUnique({ where: { id }, include: { assignments: true } });
+    if (!workOrder) throw new NotFoundException('Work order not found');
+    if (!workOrder.assignments.some((assignment) => assignment.teamId === technician.teamId)) throw new ForbiddenException('Work order is not assigned to your team');
+    if (workOrder.status !== WoStatus.ASSIGNED) throw new BadRequestException(`Work order must be assigned before starting; current status is ${workOrder.status}`);
+
+    return this.prisma.$transaction(async (tx) => {
+      const activeExecution = await tx.jobExecution.findFirst({ where: { workOrderId: id, completedAt: null } });
+      if (activeExecution) throw new BadRequestException('Work order already has an active execution');
+      const execution = await tx.jobExecution.create({ data: { workOrderId: id, technicianId: technician.id, status: WoStatus.WORKING } });
+      const updated = await tx.workOrder.update({ where: { id }, data: { status: WoStatus.WORKING } });
+      await tx.user.update({ where: { id: technician.id }, data: { status: 'WORKING' } });
+      await tx.auditLog.create({ data: { workOrderId: id, actorId: technician.id, action: 'WORK_ORDER_STARTED', details: { teamId: technician.teamId, executionId: execution.id } } });
+      return { workOrder: updated, execution };
+    });
   }
 
   @Get('dispatch/teams')
@@ -90,7 +124,5 @@ export class WorkOrdersController {
 
   @Post('mismatches/:id/review')
   @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
-  async reviewMismatch(@Req() req: any, @Param('id') id: string, @Body() body: any) {
-    return this.phase2.reviewMismatch(id, body.decision, req.user.id);
-  }
+  async reviewMismatch(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.phase2.reviewMismatch(id, body.decision, req.user.id); }
 }
