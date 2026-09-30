@@ -11,6 +11,7 @@ enum UserRole {
   TECHNICIAN
   JOB_CONTROLLER
   SUPERVISOR
+  ADMINISTRATOR
 }
 
 enum UserStatus {
@@ -53,6 +54,7 @@ model User {
   phone           String?
   email           String?    @unique
   passwordHash    String?
+  isActive        Boolean    @default(true)
   status          UserStatus @default(OFFLINE)
   lastLat         Float?
   lastLng         Float?
@@ -62,7 +64,7 @@ model User {
 
 model Nap {
   id          String   @id @default(uuid())
-  napCode     String   @unique // DIC01-10-N04
+  napCode     String   @unique
   address     String?
   lat         Float?
   lng         Float?
@@ -88,9 +90,8 @@ model Subscriber {
 model WorkOrder {
   customerSignatures CustomerSignature[]
   transfers Transfer[]
-
   id              String   @id @default(uuid())
-  woNumber        String   @unique // WO-1001
+  woNumber        String   @unique
   type            WoType
   status          WoStatus @default(DRAFT)
   subscriberId    String?
@@ -125,7 +126,7 @@ model JobExecution {
   startedAt       DateTime @default(now())
   completedAt     DateTime?
   findings        String?
-  rxPower         Float? // -19.4
+  rxPower         Float?
   downloadMbps    Int?
   uploadMbps      Int?
   pingMs          Int?
@@ -140,7 +141,7 @@ model Photo {
   id          String   @id @default(uuid())
   executionId String
   execution   JobExecution @relation(fields: [executionId], references: [id])
-  type        String // MODEM, NAP, FIBER, SPEEDTEST, PREMISES, REMOVAL, etc
+  type        String
   s3Key       String
   url         String?
   lat         Float?
@@ -163,7 +164,7 @@ model LocationLog {
 model Mismatch {
   id           String   @id @default(uuid())
   workOrderId  String?
-  type         String // NAP, GPS, PORT
+  type         String
   dbValue      String?
   reportedValue String
   reportedBy   String?
@@ -177,11 +178,10 @@ model AuditLog {
   id          BigInt   @id @default(autoincrement())
   workOrderId String?
   actorId     String?
-  action      String // ASSIGNED, STARTED, PHOTO_CAPTURED, MEASUREMENT_ENTERED, COMPLETED, MISMATCH_REPORTED
+  action      String
   details     Json?
   createdAt   DateTime @default(now())
 }
-
 
 model CustomerSignature {
   id              String   @id @default(uuid())
