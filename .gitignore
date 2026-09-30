@@ -1,0 +1,15 @@
+node_modules
+.env
+.env.local
+dist
+.build
+.expo
+.expo-shared
+ios
+android
+.DS_Store
+*.log
+.prisma
+coverage
+.next
+out
