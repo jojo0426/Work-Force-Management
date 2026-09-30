@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Query, Param, Res } from '@nestjs/common';
 import { ReportsPhase3Service } from './reports-phase3.service';
 
 @Controller('reports')
@@ -25,9 +25,7 @@ export class ReportsController {
   }
 
   @Get('audit/:workOrderId')
-  async auditTrail(@Query('workOrderId') workOrderId: string) {
-    // 09:03 assigned, 09:27 started, 09:29 GPS, 09:42 photo, 09:51 measurement, 10:05 completed
-    // Important activities should have history + who changed verified info, when, why
+  async auditTrail(@Param('workOrderId') workOrderId: string) {
     return { workOrderId, message: 'Use /audit/:id endpoint from field controller for now' };
   }
 }
