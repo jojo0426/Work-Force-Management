@@ -76,15 +76,18 @@ model Nap {
 }
 
 model Subscriber {
-  id        String  @id @default(uuid())
-  name      String
-  address   String
-  lat       Float?
-  lng       Float?
-  napId     String?
-  napPort   Int?
-  verified  Boolean @default(false)
-  createdAt DateTime @default(now())
+  id            String  @id @default(uuid())
+  accountNumber String? @unique
+  name          String
+  address       String
+  contactNumber String?
+  plan          String?
+  lat           Float?
+  lng           Float?
+  napId         String?
+  napPort       Int?
+  verified      Boolean @default(false)
+  createdAt     DateTime @default(now())
 }
 
 model WorkOrder {
