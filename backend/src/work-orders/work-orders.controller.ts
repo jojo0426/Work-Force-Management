@@ -26,7 +26,7 @@ export class WorkOrdersController {
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   async confirm(@Body() body: any, @Req() req: any) {
     const created = await this.svc.bulkCreateFromParsed(body.workOrders, req.user.id);
-    return { created: created.length, workOrders: created };
+    return { processed: created.length, workOrders: created };
   }
 
   @Get()
@@ -35,6 +35,16 @@ export class WorkOrdersController {
     const where: any = {}; if (status) where.status = status;
     const data = await this.prisma.workOrder.findMany({ where, take: 100, orderBy: { createdAt: 'desc' } });
     return { data };
+  }
+
+  @Get('dispatch/teams')
+  @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
+  async dispatchTeams() { return { teams: await this.svc.listEligibleTeams() }; }
+
+  @Post(':id/assign')
+  @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
+  async assign(@Req() req: any, @Param('id') id: string, @Body() body: { teamId: string }) {
+    return this.svc.assignToTeam(id, body.teamId, req.user.id);
   }
 
   @Get('nearby')
