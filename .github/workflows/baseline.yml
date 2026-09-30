@@ -12,7 +12,7 @@ on:
 
 jobs:
   backend:
-    name: Backend build
+    name: Backend build and RBAC validation
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,6 +24,7 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run prisma:generate
+      - run: npm run test:rbac
       - run: npm run build
 
   web:
