@@ -27,20 +27,17 @@
     "@nestjs/jwt": "^10.2.0",
     "@prisma/client": "^5.10.0",
     "socket.io": "^4.7.4",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.0.0",
     "xlsx": "^0.18.5",
     "class-validator": "^0.14.0",
     "class-transformer": "^0.5.1",
-    "bcryptjs": "^2.4.3",
-    "aws-sdk": "^2.1480.0",
-    "uuid": "^9.0.0"
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.0",
     "@types/node": "^20.0.0",
-    "@types/multer": "^1.4.11",
+    "@types/multer": "^2.0.0",
     "@types/bcryptjs": "^2.4.6",
-    "@types/uuid": "^9.0.0",
     "prisma": "^5.10.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0"
