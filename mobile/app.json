@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "FiberBlaze Tech",
+    "slug": "fiberblaze-tech",
+    "version": "1.0.0",
+    "permissions": [
+      "CAMERA",
+      "LOCATION",
+      "ACCESS_FINE_LOCATION",
+      "ACCESS_BACKGROUND_LOCATION"
+    ],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow FiberBlaze to capture field evidence"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow FiberBlaze to track technician location for dispatch"
+        }
+      ]
+    ]
+  }
+}

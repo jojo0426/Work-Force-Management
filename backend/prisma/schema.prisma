@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  TECHNICIAN
+  JOB_CONTROLLER
+  SUPERVISOR
+}
+
+enum UserStatus {
+  ONLINE
+  WORKING
+  AVAILABLE
+  OFFLINE
+}
+
+enum WoType {
+  REPAIR
+  INSTALLATION
+  TRANSFER
+}
+
+enum WoStatus {
+  DRAFT
+  ASSIGNED
+  WORKING
+  COMPLETED
+  FB_ISSUE
+  CUST_ISSUE
+  CANCELLED
+}
+
+model Team {
+  id        String   @id @default(uuid())
+  name      String
+  users     User[]
+  assignments Assignment[]
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id              String     @id @default(uuid())
+  role            UserRole
+  teamId          String?
+  team            Team?      @relation(fields: [teamId], references: [id])
+  name            String
+  phone           String?
+  email           String?    @unique
+  passwordHash    String?
+  status          UserStatus @default(OFFLINE)
+  lastLat         Float?
+  lastLng         Float?
+  lastLocationAt  DateTime?
+  createdAt       DateTime   @default(now())
+}
+
+model Nap {
+  id          String   @id @default(uuid())
+  napCode     String   @unique // DIC01-10-N04
+  address     String?
+  lat         Float?
+  lng         Float?
+  portCount   Int      @default(16)
+  verified    Boolean  @default(false)
+  verifiedBy  String?
+  verifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Subscriber {
+  id        String  @id @default(uuid())
+  name      String
+  address   String
+  lat       Float?
+  lng       Float?
+  napId     String?
+  napPort   Int?
+  verified  Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+
+model WorkOrder {
+  id              String   @id @default(uuid())
+  woNumber        String   @unique // WO-1001
+  type            WoType
+  status          WoStatus @default(DRAFT)
+  subscriberId    String?
+  oldNapId        String?
+  oldPort         Int?
+  newNapId        String?
+  newPort         Int?
+  priority        Int      @default(3)
+  remarks         String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  assignments     Assignment[]
+  executions      JobExecution[]
+}
+
+model Assignment {
+  id          String   @id @default(uuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id])
+  assignedBy  String?
+  assignedAt  DateTime @default(now())
+  @@unique([workOrderId, teamId])
+}
+
+model JobExecution {
+  id              String   @id @default(uuid())
+  workOrderId     String
+  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id])
+  technicianId    String
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  findings        String?
+  rxPower         Float? // -19.4
+  downloadMbps    Int?
+  uploadMbps      Int?
+  pingMs          Int?
+  napCodeReported String?
+  portReported    Int?
+  status          WoStatus?
+  photos          Photo[]
+  createdAt       DateTime @default(now())
+}
+
+model Photo {
+  id          String   @id @default(uuid())
+  executionId String
+  execution   JobExecution @relation(fields: [executionId], references: [id])
+  type        String // MODEM, NAP, FIBER, SPEEDTEST, PREMISES, REMOVAL, etc
+  s3Key       String
+  url         String?
+  lat         Float?
+  lng         Float?
+  capturedAt  DateTime @default(now())
+  isRequired  Boolean  @default(true)
+}
+
+model LocationLog {
+  id        BigInt   @id @default(autoincrement())
+  userId    String
+  lat       Float
+  lng       Float
+  status    UserStatus
+  isStale   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+}
+
+model Mismatch {
+  id           String   @id @default(uuid())
+  workOrderId  String?
+  type         String // NAP, GPS, PORT
+  dbValue      String?
+  reportedValue String
+  reportedBy   String?
+  status       String   @default("PENDING")
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  workOrderId String?
+  actorId     String?
+  action      String // ASSIGNED, STARTED, PHOTO_CAPTURED, MEASUREMENT_ENTERED, COMPLETED, MISMATCH_REPORTED
+  details     Json?
+  createdAt   DateTime @default(now())
+}
