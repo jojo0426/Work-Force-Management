@@ -86,6 +86,9 @@ model Subscriber {
 }
 
 model WorkOrder {
+  customerSignatures CustomerSignature[]
+  transfers Transfer[]
+
   id              String   @id @default(uuid())
   woNumber        String   @unique // WO-1001
   type            WoType
@@ -177,4 +180,122 @@ model AuditLog {
   action      String // ASSIGNED, STARTED, PHOTO_CAPTURED, MEASUREMENT_ENTERED, COMPLETED, MISMATCH_REPORTED
   details     Json?
   createdAt   DateTime @default(now())
+}
+
+
+model CustomerSignature {
+  id              String   @id @default(uuid())
+  workOrderId     String
+  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id])
+  executionId     String?
+  signatureData   String @db.Text
+  signedByName    String
+  signedByContact String?
+  signedAt        DateTime @default(now())
+  ipAddress       String?
+  deviceInfo      Json?
+  isVerified      Boolean @default(false)
+}
+
+model OptimizedRoute {
+  id                    String   @id @default(uuid())
+  technicianId          String?
+  teamId                String?
+  date                  DateTime
+  routeOrder            Json
+  totalDistanceMeters   Int?
+  totalDurationMinutes  Int?
+  optimizationScore     Float?
+  createdAt             DateTime @default(now())
+}
+
+model RouteHistory {
+  id            BigInt   @id @default(autoincrement())
+  technicianId  String
+  lat           Float
+  lng           Float
+  speedKmh      Float?
+  heading       Float?
+  createdAt     DateTime @default(now())
+  @@index([technicianId, createdAt])
+}
+
+model AnalyticsSnapshot {
+  id            String   @id @default(uuid())
+  snapshotDate  DateTime
+  metrics       Json
+  createdAt     DateTime @default(now())
+}
+
+model WorkflowRule {
+  id            String   @id @default(uuid())
+  name          String
+  triggerEvent  String
+  conditionJson Json?
+  actionType    String
+  actionConfig  Json
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+  executions    WorkflowExecution[]
+}
+
+model WorkflowExecution {
+  id          String   @id @default(uuid())
+  ruleId      String
+  rule        WorkflowRule @relation(fields: [ruleId], references: [id])
+  workOrderId String?
+  status      String @default("PENDING")
+  result      Json?
+  createdAt   DateTime @default(now())
+}
+
+model NapHealth {
+  id                  String   @id @default(uuid())
+  napId               String?
+  napCode             String
+  healthScore         Int?
+  portUtilization     Float?
+  recentIssuesCount   Int @default(0)
+  avgRxPower          Float?
+  lastChecked         DateTime @default(now())
+  alerts              Json @default("[]")
+}
+
+model NetworkAlert {
+  id          String   @id @default(uuid())
+  type        String
+  napId       String?
+  severity    String @default("MEDIUM")
+  message     String
+  isResolved  Boolean @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model IntegrationJob {
+  id            String   @id @default(uuid())
+  sourceSystem  String
+  targetSystem  String?
+  payload       Json
+  status        String @default("PENDING")
+  retries       Int @default(0)
+  lastError     String?
+  createdAt     DateTime @default(now())
+  processedAt   DateTime?
+}
+
+model Transfer {
+  id              String   @id @default(uuid())
+  workOrderId     String
+  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id])
+  oldNapId        String?
+  oldPort         Int?
+  oldLat          Float?
+  oldLng          Float?
+  removalEvidence String[] @default([])
+  newNapId        String?
+  newPort         Int?
+  newLat          Float?
+  newLng          Float?
+  installEvidence String[] @default([])
+  createdAt       DateTime @default(now())
 }
