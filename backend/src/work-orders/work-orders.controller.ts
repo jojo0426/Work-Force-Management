@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Query, Body, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Post, Get, Query, Param, Body, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { WorkOrdersService } from './work-orders.service';
 import { WorkOrdersPhase2Service } from './work-orders-phase2.service';
@@ -27,11 +27,11 @@ export class WorkOrdersController {
   @Get('smart-next') async smartNext(@Query('technicianId') techId: string, @Query('lat') lat: string, @Query('lng') lng: string) {
     return this.phase2.suggestNextJob(techId || 'demo-tech-1', parseFloat(lat) || 14.2995, parseFloat(lng) || 120.9580);
   }
-  @Get('nap/:code/location') async napLocation(@Query('code') code: string) { return this.phase2.getVerifiedLocation(code); }
+  @Get('nap/:code/location') async napLocation(@Param('code') code: string) { return this.phase2.getVerifiedLocation(code); }
   @Post('transfer') async createTransfer(@Body() body: any) { return this.phase2.createTransfer(body); }
   @Get('mismatches/pending') async pendingMismatches() {
     const data = await this.prisma.mismatch.findMany({ where: { status: 'PENDING' }, take: 50 });
     return { data, workflow: 'REPORT MISMATCH -> Supervisor Review -> Verify -> Approve/Reject' };
   }
-  @Post('mismatches/:id/review') async reviewMismatch(@Query('id') id: string, @Body() body: any) { return this.phase2.reviewMismatch(id, body.decision, body.reviewedBy); }
+  @Post('mismatches/:id/review') async reviewMismatch(@Param('id') id: string, @Body() body: any) { return this.phase2.reviewMismatch(id, body.decision, body.reviewedBy); }
 }
