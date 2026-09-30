@@ -1,16 +1,64 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 @Injectable()
 export class WorkOrdersPhase2Service {
   constructor(private prisma: PrismaService) {}
+
   async suggestNextJob(technicianId: string, currentLat: number, currentLng: number) {
-    const remaining = await this.prisma.workOrder.findMany({ where: { status: 'ASSIGNED' }, take: 20 });
-    const withDistance = remaining.map((wo: any) => ({ ...wo, distance_m: Math.floor(Math.random() * 3000) + 200 })).sort((a:any,b:any)=>a.distance_m-b.distance_m);
-    return { suggestions: withDistance.slice(0,5).map((w:any)=>({ woNumber: w.woNumber, id: w.id, distance_m: w.distance_m, type: w.type })), recommended: withDistance[0]||null, message: 'Suggestion only — no automatic rearrangement. Job Controller remains in control.' };
+    if (!Number.isFinite(currentLat) || !Number.isFinite(currentLng)) {
+      throw new BadRequestException('Current technician GPS is required for nearby work-order suggestions');
+    }
+
+    const technician = await this.prisma.user.findUnique({ where: { id: technicianId } });
+    if (!technician || technician.role !== 'TECHNICIAN' || !technician.isActive) {
+      throw new BadRequestException('A valid active technician is required');
+    }
+    if (!technician.teamId) return { suggestions: [], recommended: null, message: 'Technician has no assigned team. No work-order suggestion can be calculated.' };
+
+    const remaining = await this.prisma.workOrder.findMany({
+      where: { status: 'ASSIGNED', assignments: { some: { teamId: technician.teamId } } },
+      include: { assignments: true },
+      take: 50,
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const subscriberIds = remaining.map((wo) => wo.subscriberId).filter((id): id is string => Boolean(id));
+    const subscribers = subscriberIds.length ? await this.prisma.subscriber.findMany({ where: { id: { in: subscriberIds } } }) : [];
+    const subscriberById = new Map(subscribers.map((s) => [s.id, s]));
+
+    const withDistance = remaining.flatMap((wo) => {
+      if (!wo.subscriberId) return [];
+      const subscriber = subscriberById.get(wo.subscriberId);
+      if (!subscriber || subscriber.lat == null || subscriber.lng == null) return [];
+      return [{
+        woNumber: wo.woNumber,
+        id: wo.id,
+        type: wo.type,
+        priority: wo.priority,
+        subscriber: { accountNumber: subscriber.accountNumber, name: subscriber.name, address: subscriber.address },
+        distance_m: Math.round(this.haversine(currentLat, currentLng, subscriber.lat, subscriber.lng))
+      }];
+    }).sort((a, b) => a.distance_m - b.distance_m || a.priority - b.priority);
+
+    return {
+      suggestions: withDistance.slice(0, 5),
+      recommended: withDistance[0] || null,
+      excludedWithoutVerifiedLocation: remaining.length - withDistance.length,
+      message: 'Suggestion only — based on real GPS and the technician team assignment. No automatic rearrangement or assignment is performed.'
+    };
   }
+
+  private haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
   async getVerifiedLocation(napCode: string) {
     const nap = await this.prisma.nap.findUnique({ where: { napCode } });
-    if (nap && nap.verified && nap.lat && nap.lng) return { source: 'VERIFIED_DB', lat: nap.lat, lng: nap.lng, napCode: nap.napCode, verified: true };
+    if (nap && nap.verified && nap.lat != null && nap.lng != null) return { source: 'VERIFIED_DB', lat: nap.lat, lng: nap.lng, napCode: nap.napCode, verified: true };
     return { source: 'NEEDS_CAPTURE', message: 'Technician should capture GPS during field activity', napCode };
   }
   async reportMismatch(data: any) {
