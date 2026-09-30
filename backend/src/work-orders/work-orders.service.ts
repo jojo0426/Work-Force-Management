@@ -55,17 +55,17 @@ export class WorkOrdersService {
   async prepareImportPreview(parsed: any[]) {
     if (!Array.isArray(parsed)) throw new BadRequestException('workOrders must be an array');
     const validRows = parsed.filter((p) => p.valid);
-    const jobOrders = [...new Set(validRows.map((p) => p.jobOrder).filter(Boolean))];
-    const accountNumbers = [...new Set(validRows.map((p) => p.accountNumber).filter(Boolean))];
+    const jobOrders: string[] = [...new Set<string>(validRows.map((p) => String(p.jobOrder || '')).filter(Boolean))];
+    const accountNumbers: string[] = [...new Set<string>(validRows.map((p) => String(p.accountNumber || '')).filter(Boolean))];
     const [existingWorkOrders, existingSubscribers] = await Promise.all([
       jobOrders.length ? this.prisma.workOrder.findMany({ where: { woNumber: { in: jobOrders } }, select: { id: true, woNumber: true, status: true } }) : [],
       accountNumbers.length ? this.prisma.subscriber.findMany({ where: { accountNumber: { in: accountNumbers } }, select: { id: true, accountNumber: true, name: true } }) : []
     ]);
-    const existingWoMap = new Map(existingWorkOrders.map((wo) => [wo.woNumber, wo]));
-    const existingSubscriberMap = new Map(existingSubscribers.map((sub) => [sub.accountNumber, sub]));
+    const existingWoMap = new Map<string, (typeof existingWorkOrders)[number]>(existingWorkOrders.map((wo) => [wo.woNumber, wo] as const));
+    const existingSubscriberMap = new Map<string, (typeof existingSubscribers)[number]>(existingSubscribers.map((sub) => [sub.accountNumber, sub] as const));
     const rows = parsed.map((p) => {
-      const existingWorkOrder = p.jobOrder ? existingWoMap.get(p.jobOrder) : undefined;
-      const existingSubscriber = p.accountNumber ? existingSubscriberMap.get(p.accountNumber) : undefined;
+      const existingWorkOrder = p.jobOrder ? existingWoMap.get(String(p.jobOrder)) : undefined;
+      const existingSubscriber = p.accountNumber ? existingSubscriberMap.get(String(p.accountNumber)) : undefined;
       const action = !p.valid ? 'INVALID' : existingWorkOrder ? 'SKIP_DUPLICATE_JOB_ORDER' : existingSubscriber ? 'UPDATE_SUBSCRIBER_AND_CREATE_WORK_ORDER' : 'CREATE_SUBSCRIBER_AND_WORK_ORDER';
       return { ...p, action, existingWorkOrder: existingWorkOrder || null, existingSubscriber: existingSubscriber || null };
     });
