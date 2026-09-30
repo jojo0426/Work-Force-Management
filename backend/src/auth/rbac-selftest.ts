@@ -15,7 +15,7 @@ function contextFor(role?: UserRole): ExecutionContext {
 function guardFor(required?: UserRole[]) {
   const reflector = {
     getAllAndOverride: (key: string) => key === ROLES_KEY ? required : undefined
-  } as Reflector;
+  } as unknown as Reflector;
   return new RolesGuard(reflector);
 }
 
