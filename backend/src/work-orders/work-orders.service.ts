@@ -17,26 +17,20 @@ export class WorkOrdersService {
     const missingColumns = requiredColumns.filter((column) => !actualColumns.includes(column));
 
     if (missingColumns.length > 0) {
-      return {
-        total: rows.length,
-        valid: 0,
-        invalid: rows.length,
-        requiredColumns,
-        missingColumns,
-        templateValid: false,
-        preview: [],
-        all: []
-      };
+      return { total: rows.length, valid: 0, invalid: rows.length, requiredColumns, missingColumns, templateValid: false, preview: [], all: [] };
     }
 
     const parsed = rows.map((r, idx) => {
       const errors: string[] = [];
-      const accountNumber = (r['ACCOUNT NUMBER'] ?? r['Account Number'] ?? '').toString().trim();
-      const name = (r['NAME'] ?? r['Name'] ?? '').toString().trim();
-      const address = (r['ADDRESS'] ?? r['Address'] ?? '').toString().trim();
-      const contactNumber = (r['CONTACT NUMBER'] ?? r['Contact Number'] ?? '').toString().trim();
-      const plan = (r['PLAN'] ?? r['Plan'] ?? '').toString().trim();
-      const jobOrder = (r['JOB ORDER'] ?? r['Job Order'] ?? '').toString().trim();
+      const normalized: Record<string, any> = {};
+      for (const [key, value] of Object.entries(r)) normalized[key.trim().toUpperCase()] = value;
+
+      const accountNumber = (normalized['ACCOUNT NUMBER'] ?? '').toString().trim();
+      const name = (normalized['NAME'] ?? '').toString().trim();
+      const address = (normalized['ADDRESS'] ?? '').toString().trim();
+      const contactNumber = (normalized['CONTACT NUMBER'] ?? '').toString().trim();
+      const plan = (normalized['PLAN'] ?? '').toString().trim();
+      const jobOrder = (normalized['JOB ORDER'] ?? '').toString().trim();
 
       if (!accountNumber) errors.push('Missing account number');
       if (!name) errors.push('Missing name');
@@ -45,30 +39,11 @@ export class WorkOrdersService {
       if (!plan) errors.push('Missing plan');
       if (!jobOrder) errors.push('Missing job order');
 
-      return {
-        row: idx + 2,
-        accountNumber,
-        name,
-        address,
-        contactNumber,
-        plan,
-        jobOrder,
-        errors,
-        valid: errors.length === 0
-      };
+      return { row: idx + 2, accountNumber, name, address, contactNumber, plan, jobOrder, errors, valid: errors.length === 0 };
     });
 
     const validCount = parsed.filter((p) => p.valid).length;
-    return {
-      total: rows.length,
-      valid: validCount,
-      invalid: rows.length - validCount,
-      requiredColumns,
-      missingColumns: [],
-      templateValid: true,
-      preview: parsed.slice(0, 50),
-      all: parsed
-    };
+    return { total: rows.length, valid: validCount, invalid: rows.length - validCount, requiredColumns, missingColumns: [], templateValid: true, preview: parsed.slice(0, 50), all: parsed };
   }
 
   async bulkCreateFromParsed(parsed: any[], createdBy: string) {
@@ -76,22 +51,28 @@ export class WorkOrdersService {
     for (const p of parsed) {
       if (!p.valid) continue;
       try {
-        let sub = await this.prisma.subscriber.findFirst({ where: { name: p.name, address: p.address } });
+        let sub = await this.prisma.subscriber.findUnique({ where: { accountNumber: p.accountNumber } });
         if (!sub) {
-          sub = await this.prisma.subscriber.create({ data: { name: p.name, address: p.address } });
+          sub = await this.prisma.subscriber.create({
+            data: { accountNumber: p.accountNumber, name: p.name, address: p.address, contactNumber: p.contactNumber, plan: p.plan }
+          });
+        } else {
+          sub = await this.prisma.subscriber.update({
+            where: { id: sub.id },
+            data: { name: p.name, address: p.address, contactNumber: p.contactNumber, plan: p.plan }
+          });
+        }
+
+        const existingWo = await this.prisma.workOrder.findUnique({ where: { woNumber: p.jobOrder } });
+        if (existingWo) {
+          results.push({ skipped: true, reason: 'JOB_ORDER_ALREADY_EXISTS', workOrder: existingWo });
+          continue;
         }
 
         const wo = await this.prisma.workOrder.create({
-          data: {
-            woNumber: p.jobOrder,
-            type: 'REPAIR',
-            status: 'DRAFT',
-            subscriberId: sub.id,
-            remarks: `Account: ${p.accountNumber} | Contact: ${p.contactNumber} | Plan: ${p.plan}`,
-            createdBy
-          }
+          data: { woNumber: p.jobOrder, type: 'REPAIR', status: 'DRAFT', subscriberId: sub.id, createdBy }
         });
-        results.push(wo);
+        results.push({ skipped: false, workOrder: wo });
       } catch (e) {
         console.error('Create WO failed', p.jobOrder, e);
       }
@@ -105,15 +86,7 @@ export class WorkOrdersService {
       .filter((t) => t.lastLat != null && t.lastLng != null)
       .map((t) => {
         const distance = this.haversine(lat, lng, t.lastLat!, t.lastLng!);
-        return {
-          id: t.id,
-          name: t.name,
-          team: t.teamId,
-          status: t.status,
-          distance_m: Math.round(distance),
-          lastLocationAt: t.lastLocationAt,
-          isStale: t.lastLocationAt ? Date.now() - new Date(t.lastLocationAt).getTime() > 5 * 60 * 1000 : true
-        };
+        return { id: t.id, name: t.name, team: t.teamId, status: t.status, distance_m: Math.round(distance), lastLocationAt: t.lastLocationAt, isStale: t.lastLocationAt ? Date.now() - new Date(t.lastLocationAt).getTime() > 5 * 60 * 1000 : true };
       })
       .filter((t) => t.distance_m <= radiusMeters)
       .sort((a, b) => a.distance_m - b.distance_m);
