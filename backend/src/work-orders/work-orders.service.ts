@@ -12,42 +12,60 @@ export class WorkOrdersService {
     const sheet = wb.Sheets[sheetName];
     const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
+    const requiredColumns = ['ACCOUNT NUMBER', 'NAME', 'ADDRESS', 'CONTACT NUMBER', 'PLAN', 'JOB ORDER'];
+    const actualColumns = rows.length > 0 ? Object.keys(rows[0]).map((key) => key.toString().trim().toUpperCase()) : [];
+    const missingColumns = requiredColumns.filter((column) => !actualColumns.includes(column));
+
+    if (missingColumns.length > 0) {
+      return {
+        total: rows.length,
+        valid: 0,
+        invalid: rows.length,
+        requiredColumns,
+        missingColumns,
+        templateValid: false,
+        preview: [],
+        all: []
+      };
+    }
+
     const parsed = rows.map((r, idx) => {
       const errors: string[] = [];
-      const woNumber = (r['WO Number'] || r['WO_NUMBER'] || r['Work Order'] || `WO-${Date.now()}-${idx}`).toString().trim();
-      const typeRaw = (r['Type'] || r['Work Order Type'] || 'REPAIR').toString().toUpperCase();
-      let type: 'REPAIR' | 'INSTALLATION' | 'TRANSFER' = 'REPAIR';
-      if (typeRaw.includes('INSTALL')) type = 'INSTALLATION';
-      if (typeRaw.includes('TRANSFER') || typeRaw.includes('CHANGE')) type = 'TRANSFER';
+      const accountNumber = (r['ACCOUNT NUMBER'] ?? r['Account Number'] ?? '').toString().trim();
+      const name = (r['NAME'] ?? r['Name'] ?? '').toString().trim();
+      const address = (r['ADDRESS'] ?? r['Address'] ?? '').toString().trim();
+      const contactNumber = (r['CONTACT NUMBER'] ?? r['Contact Number'] ?? '').toString().trim();
+      const plan = (r['PLAN'] ?? r['Plan'] ?? '').toString().trim();
+      const jobOrder = (r['JOB ORDER'] ?? r['Job Order'] ?? '').toString().trim();
 
-      const subscriber = (r['Subscriber'] || r['Name'] || r['Customer'] || '').toString().trim();
-      const address = (r['Address'] || '').toString().trim();
-      const nap = (r['NAP'] || r['NAP Number'] || '').toString().trim();
-      const port = r['Port'] ? parseInt(r['Port']) : null;
-
-      if (!subscriber) errors.push('Missing subscriber name');
+      if (!accountNumber) errors.push('Missing account number');
+      if (!name) errors.push('Missing name');
       if (!address) errors.push('Missing address');
-      if (type !== 'REPAIR' && !nap) errors.push('NAP required for installation/transfer');
+      if (!contactNumber) errors.push('Missing contact number');
+      if (!plan) errors.push('Missing plan');
+      if (!jobOrder) errors.push('Missing job order');
 
       return {
         row: idx + 2,
-        woNumber,
-        type,
-        subscriber,
+        accountNumber,
+        name,
         address,
-        nap,
-        port,
-        remarks: r['Remarks'] || r['Notes'] || '',
+        contactNumber,
+        plan,
+        jobOrder,
         errors,
         valid: errors.length === 0
       };
     });
 
-    const validCount = parsed.filter(p => p.valid).length;
+    const validCount = parsed.filter((p) => p.valid).length;
     return {
       total: rows.length,
       valid: validCount,
       invalid: rows.length - validCount,
+      requiredColumns,
+      missingColumns: [],
+      templateValid: true,
       preview: parsed.slice(0, 50),
       all: parsed
     };
@@ -58,74 +76,54 @@ export class WorkOrdersService {
     for (const p of parsed) {
       if (!p.valid) continue;
       try {
-        // Find or create subscriber
-        let sub = await this.prisma.subscriber.findFirst({ where: { name: p.subscriber, address: p.address } });
+        let sub = await this.prisma.subscriber.findFirst({ where: { name: p.name, address: p.address } });
         if (!sub) {
-          sub = await this.prisma.subscriber.create({
-            data: { name: p.subscriber, address: p.address }
-          });
-        }
-        // Find NAP if provided
-        let nap = null;
-        if (p.nap) {
-          nap = await this.prisma.nap.findUnique({ where: { napCode: p.nap } });
-          if (!nap) {
-            nap = await this.prisma.nap.create({ data: { napCode: p.nap, address: p.address } });
-          }
+          sub = await this.prisma.subscriber.create({ data: { name: p.name, address: p.address } });
         }
 
         const wo = await this.prisma.workOrder.create({
           data: {
-            woNumber: p.woNumber,
-            type: p.type,
+            woNumber: p.jobOrder,
+            type: 'REPAIR',
             status: 'DRAFT',
             subscriberId: sub.id,
-            remarks: p.remarks,
+            remarks: `Account: ${p.accountNumber} | Contact: ${p.contactNumber} | Plan: ${p.plan}`,
             createdBy
           }
         });
         results.push(wo);
       } catch (e) {
-        console.error('Create WO failed', p.woNumber, e);
+        console.error('Create WO failed', p.jobOrder, e);
       }
     }
     return results;
   }
 
   async findNearbyTechnicians(lat: number, lng: number, radiusMeters = 3000) {
-    // In production: use PostGIS ST_DWithin
-    // For Phase 1: return mock + real locations from DB
-    const techs = await this.prisma.user.findMany({ where: { role: 'TECHNICIAN' }, take: 20 });
-    // Calculate haversine distance
-    const withDist = techs.map(t => {
-      const d = t.lastLat && t.lastLng ? this.haversine(lat, lng, t.lastLat, t.lastLng) : Math.random() * 5000;
-      return {
-        id: t.id,
-        name: t.name,
-        team: t.teamId || 'Team A',
-        status: t.status,
-        distance_m: Math.round(d),
-        lastLocationAt: t.lastLocationAt,
-        isStale: t.lastLocationAt ? (Date.now() - new Date(t.lastLocationAt).getTime()) > 5*60*1000 : true
-      };
-    }).filter(t => t.distance_m <= radiusMeters).sort((a,b) => a.distance_m - b.distance_m);
-
-    if (withDist.length === 0) {
-      // Fallback mock for demo if no real locations yet
-      return [
-        { id: 'team-a', name: 'Team A — J. Garcia', team: 'Team A', status: 'AVAILABLE', distance_m: 650, isStale: false },
-        { id: 'team-b', name: 'Team B — M. Santos', team: 'Team B', status: 'WORKING', distance_m: 1400, isStale: false },
-        { id: 'team-c', name: 'Team C — L. Reyes', team: 'Team C', status: 'ONLINE', distance_m: 3200, isStale: true, lastLocationAt: new Date(Date.now()-10*60*1000) },
-      ];
-    }
-    return withDist;
+    const techs = await this.prisma.user.findMany({ where: { role: 'TECHNICIAN', isActive: true }, take: 20 });
+    return techs
+      .filter((t) => t.lastLat != null && t.lastLng != null)
+      .map((t) => {
+        const distance = this.haversine(lat, lng, t.lastLat!, t.lastLng!);
+        return {
+          id: t.id,
+          name: t.name,
+          team: t.teamId,
+          status: t.status,
+          distance_m: Math.round(distance),
+          lastLocationAt: t.lastLocationAt,
+          isStale: t.lastLocationAt ? Date.now() - new Date(t.lastLocationAt).getTime() > 5 * 60 * 1000 : true
+        };
+      })
+      .filter((t) => t.distance_m <= radiusMeters)
+      .sort((a, b) => a.distance_m - b.distance_m);
   }
 
   haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
     const R = 6371000;
-    const dLat = (lat2-lat1)*Math.PI/180;
-    const dLon = (lon2-lon1)*Math.PI/180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 }
