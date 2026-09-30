@@ -35,14 +35,58 @@ export class WorkOrdersService {
       if (!jobOrder) errors.push('Missing job order');
       return { row: idx + 2, accountNumber, name, address, contactNumber, plan, jobOrder, errors, valid: errors.length === 0 };
     });
+
+    const accountCounts = new Map<string, number>();
+    const jobOrderCounts = new Map<string, number>();
+    for (const p of parsed) {
+      if (p.accountNumber) accountCounts.set(p.accountNumber, (accountCounts.get(p.accountNumber) || 0) + 1);
+      if (p.jobOrder) jobOrderCounts.set(p.jobOrder, (jobOrderCounts.get(p.jobOrder) || 0) + 1);
+    }
+    for (const p of parsed) {
+      if (p.accountNumber && (accountCounts.get(p.accountNumber) || 0) > 1) p.errors.push('Duplicate account number in uploaded file');
+      if (p.jobOrder && (jobOrderCounts.get(p.jobOrder) || 0) > 1) p.errors.push('Duplicate job order in uploaded file');
+      p.valid = p.errors.length === 0;
+    }
+
     const validCount = parsed.filter((p) => p.valid).length;
     return { total: rows.length, valid: validCount, invalid: rows.length - validCount, requiredColumns, missingColumns: [], templateValid: true, preview: parsed.slice(0, 50), all: parsed };
   }
 
+  async prepareImportPreview(parsed: any[]) {
+    if (!Array.isArray(parsed)) throw new BadRequestException('workOrders must be an array');
+    const validRows = parsed.filter((p) => p.valid);
+    const jobOrders = [...new Set(validRows.map((p) => p.jobOrder).filter(Boolean))];
+    const accountNumbers = [...new Set(validRows.map((p) => p.accountNumber).filter(Boolean))];
+    const [existingWorkOrders, existingSubscribers] = await Promise.all([
+      jobOrders.length ? this.prisma.workOrder.findMany({ where: { woNumber: { in: jobOrders } }, select: { id: true, woNumber: true, status: true } }) : [],
+      accountNumbers.length ? this.prisma.subscriber.findMany({ where: { accountNumber: { in: accountNumbers } }, select: { id: true, accountNumber: true, name: true } }) : []
+    ]);
+    const existingWoMap = new Map(existingWorkOrders.map((wo) => [wo.woNumber, wo]));
+    const existingSubscriberMap = new Map(existingSubscribers.map((sub) => [sub.accountNumber, sub]));
+    const rows = parsed.map((p) => {
+      const existingWorkOrder = p.jobOrder ? existingWoMap.get(p.jobOrder) : undefined;
+      const existingSubscriber = p.accountNumber ? existingSubscriberMap.get(p.accountNumber) : undefined;
+      const action = !p.valid ? 'INVALID' : existingWorkOrder ? 'SKIP_DUPLICATE_JOB_ORDER' : existingSubscriber ? 'UPDATE_SUBSCRIBER_AND_CREATE_WORK_ORDER' : 'CREATE_SUBSCRIBER_AND_WORK_ORDER';
+      return { ...p, action, existingWorkOrder: existingWorkOrder || null, existingSubscriber: existingSubscriber || null };
+    });
+    return {
+      summary: {
+        totalRows: rows.length,
+        invalidRows: rows.filter((r) => r.action === 'INVALID').length,
+        duplicateJobOrders: rows.filter((r) => r.action === 'SKIP_DUPLICATE_JOB_ORDER').length,
+        subscribersToUpdate: rows.filter((r) => r.action === 'UPDATE_SUBSCRIBER_AND_CREATE_WORK_ORDER').length,
+        subscribersToCreate: rows.filter((r) => r.action === 'CREATE_SUBSCRIBER_AND_WORK_ORDER').length,
+        workOrdersToCreate: rows.filter((r) => r.action === 'UPDATE_SUBSCRIBER_AND_CREATE_WORK_ORDER' || r.action === 'CREATE_SUBSCRIBER_AND_WORK_ORDER').length
+      },
+      rows
+    };
+  }
+
   async bulkCreateFromParsed(parsed: any[], createdBy: string) {
+    const preview = await this.prepareImportPreview(parsed);
+    const eligible = preview.rows.filter((p) => p.action === 'UPDATE_SUBSCRIBER_AND_CREATE_WORK_ORDER' || p.action === 'CREATE_SUBSCRIBER_AND_WORK_ORDER');
     const results = [];
-    for (const p of parsed) {
-      if (!p.valid) continue;
+    for (const p of eligible) {
       try {
         let sub = await this.prisma.subscriber.findUnique({ where: { accountNumber: p.accountNumber } });
         if (!sub) sub = await this.prisma.subscriber.create({ data: { accountNumber: p.accountNumber, name: p.name, address: p.address, contactNumber: p.contactNumber, plan: p.plan } });
@@ -50,17 +94,15 @@ export class WorkOrdersService {
         const existingWo = await this.prisma.workOrder.findUnique({ where: { woNumber: p.jobOrder } });
         if (existingWo) { results.push({ skipped: true, reason: 'JOB_ORDER_ALREADY_EXISTS', workOrder: existingWo }); continue; }
         const wo = await this.prisma.workOrder.create({ data: { woNumber: p.jobOrder, type: 'REPAIR', status: 'DRAFT', subscriberId: sub.id, createdBy } });
+        await this.prisma.auditLog.create({ data: { workOrderId: wo.id, actorId: createdBy, action: 'WORK_ORDER_IMPORTED', details: { accountNumber: p.accountNumber, source: 'EXCEL_IMPORT' } } });
         results.push({ skipped: false, workOrder: wo });
       } catch (e) { console.error('Create WO failed', p.jobOrder, e); }
     }
-    return results;
+    return { previewSummary: preview.summary, created: results.filter((r) => !r.skipped).length, skipped: preview.summary.duplicateJobOrders + results.filter((r) => r.skipped).length, invalid: preview.summary.invalidRows, results };
   }
 
   async listEligibleTeams() {
-    const teams = await this.prisma.team.findMany({
-      orderBy: { name: 'asc' },
-      include: { users: { where: { role: UserRole.TECHNICIAN, isActive: true }, select: { id: true, name: true, status: true, lastLat: true, lastLng: true, lastLocationAt: true } } }
-    });
+    const teams = await this.prisma.team.findMany({ orderBy: { name: 'asc' }, include: { users: { where: { role: UserRole.TECHNICIAN, isActive: true }, select: { id: true, name: true, status: true, lastLat: true, lastLng: true, lastLocationAt: true } } } });
     return teams.map((team) => ({ id: team.id, name: team.name, activeTechnicians: team.users.length, technicians: team.users }));
   }
 
