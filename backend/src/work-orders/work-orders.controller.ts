@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Query, Param, Body, UploadedFile, UseInterceptors, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException, Controller, Post, Get, Query, Param, Body, UploadedFile, UseInterceptors, UseGuards, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
 import { WorkOrdersService } from './work-orders.service';
@@ -44,6 +44,7 @@ export class WorkOrdersController {
   @Post(':id/assign')
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   async assign(@Req() req: any, @Param('id') id: string, @Body() body: { teamId: string }) {
+    if (!body.teamId) throw new BadRequestException('teamId is required');
     return this.svc.assignToTeam(id, body.teamId, req.user.id);
   }
 
@@ -57,8 +58,12 @@ export class WorkOrdersController {
   @Get('smart-next')
   @Roles(UserRole.TECHNICIAN, UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   async smartNext(@Req() req: any, @Query('technicianId') techId: string, @Query('lat') lat: string, @Query('lng') lng: string) {
-    const technicianId = req.user.role === UserRole.TECHNICIAN ? req.user.id : (techId || req.user.id);
-    return this.phase2.suggestNextJob(technicianId, parseFloat(lat) || 14.2995, parseFloat(lng) || 120.9580);
+    const technicianId = req.user.role === UserRole.TECHNICIAN ? req.user.id : techId;
+    if (!technicianId) throw new BadRequestException('technicianId is required for management requests');
+    const currentLat = Number(lat);
+    const currentLng = Number(lng);
+    if (!Number.isFinite(currentLat) || !Number.isFinite(currentLng)) throw new BadRequestException('Current technician latitude and longitude are required');
+    return this.phase2.suggestNextJob(technicianId, currentLat, currentLng);
   }
 
   @Get('nap/:code/location')
