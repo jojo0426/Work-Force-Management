@@ -11,7 +11,7 @@ export class ReportsController {
   }
 
   @Get('export')
-  async export(@Query('format') format: string, @Query('range') range: string, @Query('from') from?: string, @Query('to') to?: string, @Res() res: any) {
+  async export(@Res() res: any, @Query('format') format: string, @Query('range') range: string, @Query('from') from?: string, @Query('to') to?: string) {
     if (format === 'excel' || format === 'xlsx') {
       const buf = await this.reports.exportExcel(range || 'monthly', from, to);
       res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="fiberblaze-report-'+range+'.xlsx"' });
