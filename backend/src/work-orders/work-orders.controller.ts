@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, ForbiddenException, NotFoundException, Post, Get, Query, Param, Body, UploadedFile, UseInterceptors, UseGuards, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UserRole, WoStatus } from '@prisma/client';
+import { UserRole, WoStatus, WoType } from '@prisma/client';
 import { WorkOrdersService } from './work-orders.service';
 import { WorkOrdersPhase2Service } from './work-orders-phase2.service';
 import { PrismaService } from '../prisma.service';
@@ -79,11 +79,20 @@ export class WorkOrdersController {
     const workOrder = await this.prisma.workOrder.findUnique({ where: { id } });
     if (!workOrder || workOrder.status !== WoStatus.WORKING) throw new BadRequestException('Evidence can only be added to a working work order');
     if (body.captureSource !== 'CAMERA') throw new BadRequestException('Evidence must be captured using the in-app camera');
-    if (!body.s3Key || !body.type) throw new BadRequestException('Evidence type and uploaded storage key are required');
+    if (!body.s3Key || !body.type || !body.capturedAt) throw new BadRequestException('Evidence type, capture timestamp, and uploaded storage key are required');
     const allowedTypes = ['WORK_RESULT', 'SPEEDTEST', 'FB_ISSUE', 'CUST_ISSUE', 'INSTALLATION', 'TRANSFER_REMOVAL', 'TRANSFER_INSTALL'];
     if (!allowedTypes.includes(String(body.type))) throw new BadRequestException('Unsupported evidence type');
-    const photo = await this.prisma.photo.create({ data: { executionId: execution.id, type: String(body.type), s3Key: String(body.s3Key), url: body.url || null, lat: Number.isFinite(Number(body.lat)) ? Number(body.lat) : null, lng: Number.isFinite(Number(body.lng)) ? Number(body.lng) : null, isRequired: true } });
-    await this.prisma.auditLog.create({ data: { workOrderId: id, actorId: req.user.id, action: 'WORK_ORDER_EVIDENCE_ADDED', details: { executionId: execution.id, photoId: photo.id, type: photo.type, captureSource: 'CAMERA' } } });
+    const capturedAt = new Date(body.capturedAt);
+    if (Number.isNaN(capturedAt.getTime())) throw new BadRequestException('Evidence capture timestamp is invalid');
+    const now = Date.now();
+    if (capturedAt.getTime() > now + 60_000) throw new BadRequestException('Evidence capture timestamp cannot be in the future');
+    if (capturedAt < execution.startedAt) throw new BadRequestException('Evidence must be captured after the work execution started');
+    const lat = body.lat == null ? null : Number(body.lat);
+    const lng = body.lng == null ? null : Number(body.lng);
+    if (lat != null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) throw new BadRequestException('Evidence latitude is invalid');
+    if (lng != null && (!Number.isFinite(lng) || lng < -180 || lng > 180)) throw new BadRequestException('Evidence longitude is invalid');
+    const photo = await this.prisma.photo.create({ data: { executionId: execution.id, type: String(body.type), s3Key: String(body.s3Key), url: body.url || null, lat, lng, capturedAt, isRequired: true } });
+    await this.prisma.auditLog.create({ data: { workOrderId: id, actorId: req.user.id, action: 'WORK_ORDER_EVIDENCE_ADDED', details: { executionId: execution.id, photoId: photo.id, type: photo.type, captureSource: 'CAMERA', capturedAt: capturedAt.toISOString() } } });
     return { evidence: photo };
   }
 
@@ -101,17 +110,47 @@ export class WorkOrdersController {
     const technician = await this.prisma.user.findUnique({ where: { id: req.user.id }, select: { teamId: true, isActive: true } });
     if (!technician?.isActive || !technician.teamId || !workOrder.assignments.some((a) => a.teamId === technician.teamId)) throw new ForbiddenException('Technician is not authorized to finish this work order');
     if (!String(body.findings || '').trim()) throw new BadRequestException('Findings are required before finishing a work order');
+
     const evidenceTypes = new Set(execution.photos.map((p) => p.type));
-    const requiredEvidenceType = finalStatus === WoStatus.COMPLETED ? 'WORK_RESULT' : finalStatus;
-    if (!evidenceTypes.has(requiredEvidenceType)) throw new BadRequestException(`${requiredEvidenceType} camera evidence is required before setting status to ${finalStatus}`);
-    if (body.requiresSpeedTest === true && !evidenceTypes.has('SPEEDTEST')) throw new BadRequestException('SPEEDTEST camera evidence is required for this result');
+    const requiredEvidence = new Set<string>();
+    if (finalStatus === WoStatus.COMPLETED) {
+      requiredEvidence.add(workOrder.type === WoType.INSTALLATION ? 'INSTALLATION' : 'WORK_RESULT');
+      if (workOrder.type === WoType.TRANSFER) {
+        requiredEvidence.delete('WORK_RESULT');
+        requiredEvidence.add('TRANSFER_REMOVAL');
+        requiredEvidence.add('TRANSFER_INSTALL');
+      }
+    } else {
+      requiredEvidence.add(finalStatus);
+    }
+
+    const resultCode = String(body.resultCode || '').trim().toUpperCase();
+    const speedTestResultCodes = new Set(['SLOW_BROWSING', 'SPEED_NOT_MET', 'INTERMITTENT_SPEED']);
+    const speedTestRequired = speedTestResultCodes.has(resultCode);
+    if (speedTestRequired) requiredEvidence.add('SPEEDTEST');
+    for (const requiredType of requiredEvidence) {
+      if (!evidenceTypes.has(requiredType)) throw new BadRequestException(`${requiredType} camera evidence is required before setting status to ${finalStatus}`);
+    }
+
+    const numberOrNull = (value: any, field: string, min: number, max: number) => {
+      if (value == null || value === '') return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < min || parsed > max) throw new BadRequestException(`${field} is outside the allowed range`);
+      return parsed;
+    };
+    const rxPower = numberOrNull(body.rxPower, 'rxPower', -60, 20);
+    const downloadMbps = numberOrNull(body.downloadMbps, 'downloadMbps', 0, 100000);
+    const uploadMbps = numberOrNull(body.uploadMbps, 'uploadMbps', 0, 100000);
+    const pingMs = numberOrNull(body.pingMs, 'pingMs', 0, 600000);
+    const portReported = numberOrNull(body.portReported, 'portReported', 1, 100000);
+    if (speedTestRequired && (downloadMbps == null || uploadMbps == null || pingMs == null)) throw new BadRequestException('Download, upload, and ping measurements are required for speed-related results');
 
     return this.prisma.$transaction(async (tx) => {
-      const finishedExecution = await tx.jobExecution.update({ where: { id: execution.id }, data: { completedAt: new Date(), findings: String(body.findings).trim(), rxPower: body.rxPower == null ? null : Number(body.rxPower), downloadMbps: body.downloadMbps == null ? null : Number(body.downloadMbps), uploadMbps: body.uploadMbps == null ? null : Number(body.uploadMbps), pingMs: body.pingMs == null ? null : Number(body.pingMs), napCodeReported: body.napCodeReported || null, portReported: body.portReported == null ? null : Number(body.portReported), status: finalStatus } });
+      const finishedExecution = await tx.jobExecution.update({ where: { id: execution.id }, data: { completedAt: new Date(), findings: String(body.findings).trim(), rxPower, downloadMbps, uploadMbps, pingMs, napCodeReported: body.napCodeReported || null, portReported, status: finalStatus } });
       const updated = await tx.workOrder.update({ where: { id }, data: { status: finalStatus } });
       await tx.user.update({ where: { id: req.user.id }, data: { status: 'AVAILABLE' } });
-      await tx.auditLog.create({ data: { workOrderId: id, actorId: req.user.id, action: 'WORK_ORDER_FINISHED', details: { executionId: execution.id, finalStatus, evidenceTypes: [...evidenceTypes], requiresSpeedTest: body.requiresSpeedTest === true } } });
-      return { workOrder: updated, execution: finishedExecution, evidenceCount: execution.photos.length };
+      await tx.auditLog.create({ data: { workOrderId: id, actorId: req.user.id, action: 'WORK_ORDER_FINISHED', details: { executionId: execution.id, finalStatus, resultCode: resultCode || null, evidenceTypes: [...evidenceTypes], requiredEvidence: [...requiredEvidence], speedTestRequired } } });
+      return { workOrder: updated, execution: finishedExecution, evidenceCount: execution.photos.length, requiredEvidence: [...requiredEvidence] };
     });
   }
 
