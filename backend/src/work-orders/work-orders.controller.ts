@@ -17,16 +17,23 @@ export class WorkOrdersController {
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   @UseInterceptors(FileInterceptor('file'))
   async uploadExcel(@UploadedFile() file: Express.Multer.File) {
-    if (!file) return { error: 'No file' };
+    if (!file) throw new BadRequestException('Excel file is required');
     const result = this.svc.parseExcel(file.buffer);
-    return { message: 'Excel parsed. Call /work-orders/confirm', filename: file.originalname, ...result };
+    return { message: 'Excel parsed. Review rows, then call /work-orders/import-preview before confirmation.', filename: file.originalname, ...result };
+  }
+
+  @Post('import-preview')
+  @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
+  async importPreview(@Body() body: any) {
+    return this.svc.prepareImportPreview(body.workOrders);
   }
 
   @Post('confirm')
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   async confirm(@Body() body: any, @Req() req: any) {
-    const created = await this.svc.bulkCreateFromParsed(body.workOrders, req.user.id);
-    return { processed: created.length, workOrders: created };
+    if (!Array.isArray(body.workOrders)) throw new BadRequestException('workOrders must be an array');
+    const result = await this.svc.bulkCreateFromParsed(body.workOrders, req.user.id);
+    return { message: 'Excel import confirmation processed', ...result };
   }
 
   @Get()
