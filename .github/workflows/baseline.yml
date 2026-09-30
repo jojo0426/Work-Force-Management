@@ -6,6 +6,7 @@ on:
       - wfm-phase-a1-baseline
       - wfm-phase-2-auth-rbac
       - wfm-phase-2-dependency-hardening
+      - wfm-phase-3-workorder-dispatch
   pull_request:
     branches:
       - main
