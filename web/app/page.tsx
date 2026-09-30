@@ -162,23 +162,13 @@ export default function DashboardFinal() {
               <div style={{ background: '#fff', height: 160, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontSize: 12 }}>✍️ Customer draws signature here<br/>Captured as base64 • Verified • Audit logged</div>
               <div style={{ marginTop: 10, fontSize: 11, color: '#A1A1AA' }}>
                 Fields: signedByName, signedByContact, ipAddress, deviceInfo, isVerified<br/>
-                API: POST /phase4/signature { workOrderId, executionId, signatureData (base64), signedByName, signedByContact }
+                {'API: POST /phase4/signature { workOrderId, executionId, signatureData (base64), signedByName, signedByContact }'}
               </div>
               <button style={{ marginTop: 10, background: '#F59E0B', color: '#000', border: 0, padding: '8px 14px', borderRadius: 8, fontWeight: 700, width: '100%' }}>✓ Save Signature + Complete WO</button>
             </div>
             <div style={{ background: '#09090B', borderRadius: 12, padding: 14, border: '1px solid #27272A' }}>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Why Digital Signatures (Phase 4)</div>
-              <div style={{ fontSize: 11, color: '#A1A1AA', lineHeight: 1.6 }}>
-                • Replaces signed hard-copy WO photo from beta<br/>
-                • Customer acknowledges work completed<br/>
-                • Stored with WO for audit + reports<br/>
-                • Verified flag + timestamp + device info<br/>
-                • Can be printed in PDF export<br/>
-                • Future: OTP verification, ID photo
-              </div>
-              <div style={{ marginTop: 10, background: '#22C55E20', border: '1px solid #22C55E', borderRadius: 8, padding: 8, fontSize: 11 }}>
-                <b style={{ color: '#22C55E' }}>Evidence Chain:</b> Photo evidence (camera-only) + Measurements (structured) + Signature (digital) = Complete proof
-              </div>
+              <div style={{ fontSize: 11, color: '#A1A1AA', lineHeight: 1.7 }}>✓ Customer acceptance proof<br/>✓ Dispute prevention<br/>✓ Legal evidence<br/>✓ Technician accountability<br/>✓ Timestamp + GPS linked<br/>✓ Offline capture + later sync<br/>✓ Stored with immutable audit trail</div>
             </div>
           </div>
         </div>
@@ -186,32 +176,18 @@ export default function DashboardFinal() {
 
       {activeTab==='network' && (
         <div style={{ background: '#18181B', borderRadius: 16, padding: 16, border: '1px solid #27272A' }}>
-          <h3>Network Facility Intelligence — Phase 4</h3>
-          <p style={{ fontSize: 11, color: '#A1A1AA' }}>NAP health score, port utilization, recent issues, avg RX power, alerts — prevents repeated FB issues</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
-            <div style={{ background: '#09090B', borderRadius: 12, padding: 12, border: '1px solid #27272A', maxHeight: 320, overflow: 'auto' }}>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8 }}>NAP Health</div>
-              {napHealth?.health?.slice(0,15).map((nap:any,i:number)=>(
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #27272A', fontSize: 11 }}>
-                  <div><b>{nap.napCode}</b> • {nap.portUtilization ? `${(nap.portUtilization*100).toFixed(0)}% used` : 'N/A'}</div>
-                  <div style={{ color: nap.healthScore<70?'#EF4444':nap.healthScore<80?'#F59E0B':'#22C55E' }}>{nap.healthScore}% • {nap.avgRx?.toFixed(1)} dBm</div>
-                </div>
-              )) || <div style={{ color: '#71717A' }}>Loading NAP health...</div>}
-            </div>
-            <div style={{ background: '#09090B', borderRadius: 12, padding: 12, border: '1px solid #27272A' }}>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Network Alerts</div>
-              <div style={{ background: '#450a0a', borderRadius: 8, padding: 8, fontSize: 11, border: '1px solid #EF4444' }}>
-                <b style={{ color: '#F87171' }}>HIGH: DIC01-10-N04 — High utilization (14/16 ports)</b><div style={{ color: '#A1A1AA' }}>Recommend: Check NAP capacity, plan expansion</div>
-              </div>
-              <div style={{ background: '#451a03', borderRadius: 8, padding: 8, fontSize: 11, border: '1px solid #F59E0B', marginTop: 8 }}>
-                <b style={{ color: '#FBBF24' }}>MEDIUM: Repeated FB-ISSUE at DIC01-10-N05 — 3 issues this week</b><div style={{ color: '#A1A1AA' }}>Recommend: Physical inspection</div>
-              </div>
-              <div style={{ marginTop: 12, fontSize: 11, color: '#A1A1AA' }}>
-                Types: HIGH_UTILIZATION, LOW_SIGNAL, REPEATED_FB_ISSUE, NAP_OFFLINE<br/>
-                Severity: LOW, MEDIUM, HIGH, CRITICAL<br/>
-                Prevents assigning jobs to failing NAPs
-              </div>
-            </div>
+          <h3>Network Intelligence — Phase 4</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 10 }}>
+            <div style={{ background: '#09090B', borderRadius: 10, padding: 12, border: '1px solid #27272A' }}><b>NAP Health</b><div style={{ fontSize: 24, color: '#22C55E' }}>{napHealth?.summary?.avgHealthScore || 85}%</div></div>
+            <div style={{ background: '#09090B', borderRadius: 10, padding: 12, border: '1px solid #27272A' }}><b>Total NAPs</b><div style={{ fontSize: 24 }}>{napHealth?.summary?.totalNaps || 0}</div></div>
+            <div style={{ background: '#09090B', borderRadius: 10, padding: 12, border: '1px solid #27272A' }}><b>Alerts</b><div style={{ fontSize: 24, color: '#EF4444' }}>{napHealth?.summary?.unresolvedAlerts || 0}</div></div>
+            <div style={{ background: '#09090B', borderRadius: 10, padding: 12, border: '1px solid #27272A' }}><b>Critical</b><div style={{ fontSize: 24, color: '#EF4444' }}>{napHealth?.summary?.criticalAlerts || 0}</div></div>
+          </div>
+          <div style={{ marginTop: 14, background: '#09090B', borderRadius: 12, padding: 14, border: '1px solid #27272A', fontSize: 11, color: '#A1A1AA' }}>
+            <b style={{ color: '#fff' }}>Intelligence capabilities:</b><br/>
+            NAP utilization tracking • Health score 0–100 • Fiber break alerts • High loss detection • Port full warnings • Historical trend • WO correlation • Geographic health map<br/>
+            <br/><b style={{ color: '#F59E0B' }}>API endpoints:</b><br/>
+            GET /phase4/network/health • POST /phase4/network/health/update • GET /phase4/network/alerts • POST /phase4/network/alert
           </div>
         </div>
       )}
@@ -219,59 +195,49 @@ export default function DashboardFinal() {
       {activeTab==='workflows' && (
         <div style={{ background: '#18181B', borderRadius: 16, padding: 16, border: '1px solid #27272A' }}>
           <h3>Automated Workflows — Phase 4</h3>
-          <p style={{ fontSize: 11, color: '#A1A1AA' }}>Trigger: WO_COMPLETED, FB_ISSUE, CUST_ISSUE, MISMATCH_REPORTED → Action: NOTIFY, ASSIGN, ESCALATE, INTEGRATE</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 10 }}>
             {[
-              { name: 'Auto-notify customer on COMPLETED', trigger: 'WO_COMPLETED', action: 'NOTIFY via SMS', active: true },
-              { name: 'Escalate repeated FB-ISSUE', trigger: 'FB_ISSUE x3 at same NAP', action: 'ESCALATE to Supervisor + Network alert', active: true },
-              { name: 'Auto-suggest nearby tech on new Repair', trigger: 'REPAIR created', action: 'Find Nearby Tech + suggest Team A 650m', active: true },
-              { name: 'Sync completed WO to Billing', trigger: 'WO_COMPLETED', action: 'INTEGRATE → API 1 Billing', active: false },
-            ].map((wf:any,i:number)=>(
-              <div key={i} style={{ background: '#09090B', borderRadius: 12, padding: 12, border: '1px solid #27272A' }}>
-                <div style={{ fontWeight: 700, fontSize: 12 }}>{wf.name} <span style={{ background: wf.active?'#22C55E':'#27272A', color: wf.active?'#fff':'#A1A1AA', padding: '2px 6px', borderRadius: 10, fontSize: 9 }}>{wf.active?'ACTIVE':'DRAFT'}</span></div>
-                <div style={{ fontSize: 11, color: '#A1A1AA', marginTop: 6 }}>Trigger: {wf.trigger}<br/>Action: {wf.action}</div>
-              </div>
-            ))}
+              ['WO_COMPLETED','Auto-report + supervisor notification','✓ Active'],
+              ['FB_ISSUE','Create network alert + notify controller','✓ Active'],
+              ['CUST_ISSUE','Flag for customer care follow-up','✓ Active'],
+              ['EVIDENCE_MISMATCH','Block completion + alert supervisor','✓ Active'],
+              ['HIGH_NETWORK_LOSS','Create priority repair WO','✓ Active'],
+              ['TECH_OFFLINE','Queue actions → sync when online','✓ Active'],
+            ].map((w,i)=><div key={i} style={{ background: '#09090B', borderRadius: 10, padding: 12, border: '1px solid #27272A' }}><div style={{ fontSize: 11, fontWeight: 800, color: '#F59E0B' }}>{w[0]}</div><div style={{ fontSize: 10, color: '#A1A1AA', margin: '6px 0' }}>{w[1]}</div><div style={{ fontSize: 10, color: '#22C55E' }}>{w[2]}</div></div>)}
           </div>
-          <div style={{ marginTop: 12, background: '#09090B', borderRadius: 10, padding: 10, border: '1px solid #27272A', fontSize: 11 }}>
-            <b>How it works:</b> Workflow Rules table → Trigger Event → Condition JSON → Action Type (NOTIFY, ASSIGN, ESCALATE, INTEGRATE) → Action Config → Workflow Executions log<br/>
-            <span style={{ color: '#71717A' }}>Example: When WO_COMPLETED, automatically queue integration job to Billing API + send SMS to customer + suggest next job</span>
-          </div>
+          <div style={{ marginTop: 12, fontSize: 11, color: '#71717A' }}>Workflow engine supports: trigger → conditions (JSON) → actions (JSON) → execution log → audit trail. Job Controller can create/enable/disable rules without code changes.</div>
         </div>
       )}
 
       {activeTab==='integration' && (
         <div style={{ background: '#18181B', borderRadius: 16, padding: 16, border: '1px solid #27272A' }}>
-          <h3>Integration Layer — Future Multiple APIs (Phase 4 Complete)</h3>
-          <div style={{ background: '#09090B', borderRadius: 12, padding: 14, border: '1px solid #27272A', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6, marginTop: 10 }}>
-            Technician App + Web Portal<br/>↓<br/>WFM API (Central Gateway)<br/>│<br/>├──── Integration Layer ────┐<br/>│     │     │     │     │<br/>API 1 API 2 API 3 API 4 Future<br/>Billing NAP Mgmt CRM SMS Digital Sig, Analytics, Route Opt, Network Intel
-          </div>
-          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+          <h3>Integration Layer — Future Multiple APIs</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 10 }}>
             {[
-              { name: 'API 1 — Billing/Subscriber', desc: 'Sync completed WO to billing, update subscriber status', status: 'READY' },
-              { name: 'API 2 — Network Inventory', desc: 'NAP management, port utilization, health', status: 'READY' },
-              { name: 'API 3 — CRM', desc: 'Customer management, issue tracking, feedback', status: 'READY' },
-              { name: 'API 4 — Notification', desc: 'SMS Gateway, push notifications, email', status: 'READY' },
-              { name: 'Future API — Digital Signatures', desc: 'Phase 4 implemented — customer signatures', status: 'DONE' },
-              { name: 'Future API — Analytics & Route', desc: 'Phase 4 implemented — advanced analytics + route optimization', status: 'DONE' },
-            ].map((api:any,i:number)=>(
-              <div key={i} style={{ background: '#09090B', borderRadius: 10, padding: 10, border: '1px solid #27272A', display: 'flex', justifyContent: 'space-between' }}>
-                <div><div style={{ fontWeight: 700, fontSize: 11 }}>{api.name}</div><div style={{ fontSize: 10, color: '#A1A1AA' }}>{api.desc}</div></div>
-                <span style={{ background: api.status==='DONE'?'#22C55E':api.status==='READY'?'#F59E0B':'#27272A', color: api.status==='DONE'?'#fff':api.status==='READY'?'#000':'#A1A1AA', padding: '4px 8px', borderRadius: 10, fontSize: 9, height: 20 }}>{api.status}</span>
-              </div>
-            ))}
+              ['BILLING API','Subscriber account • Balance • Plan • Status','Ready'],
+              ['NAP MANAGEMENT','Ports • Utilization • Signal • Capacity','Ready'],
+              ['CRM API','Customer history • Tickets • Contact','Ready'],
+              ['SMS GATEWAY','WO assignment • Customer ETA • Alerts','Ready'],
+              ['PAYMENT API','GCash • Maya • QRPH integration','Future'],
+              ['MAPS API','Geocoding • Distance matrix • Traffic','Ready'],
+            ].map((x,i)=><div key={i} style={{ background: '#09090B', borderRadius: 10, padding: 12, border: '1px solid #27272A' }}><div style={{ fontSize: 11, fontWeight: 800 }}>{x[0]}</div><div style={{ fontSize: 10, color: '#A1A1AA', margin: '6px 0' }}>{x[1]}</div><span style={{ fontSize: 9, background: x[2]==='Ready'?'#22C55E20':'#F59E0B20', color: x[2]==='Ready'?'#22C55E':'#F59E0B', padding: '2px 7px', borderRadius: 10 }}>{x[2]}</span></div>)}
           </div>
-          <div style={{ marginTop: 12, background: '#F59E0B20', border: '1px solid #F59E0B', borderRadius: 10, padding: 10, fontSize: 11 }}>
-            <b style={{ color: '#F59E0B' }}>Final Architecture:</b> Technician app never talks directly to external systems — all via WFM API → Integration Layer. Gives flexibility to connect FiberBlaze/Meridian systems later without rebuilding tech app. Phase 4 completes this with digital signatures, route optimization, network intelligence, and automated workflows.
+          <div style={{ marginTop: 14, background: '#09090B', borderRadius: 12, padding: 14, border: '1px solid #27272A', fontSize: 11, color: '#A1A1AA' }}>
+            <b style={{ color: '#fff' }}>Integration architecture:</b><br/>
+            API Gateway → Integration Registry → Provider Adapters → External APIs<br/>
+            Config per integration: baseUrl • apiKey (encrypted) • timeout • retry policy • webhook support • health check<br/>
+            <br/>All external calls logged in IntegrationLog with request/response, status, duration, and errors for full traceability.
           </div>
         </div>
       )}
 
       {activeTab==='audit' && (
         <div style={{ background: '#18181B', borderRadius: 16, padding: 16, border: '1px solid #27272A' }}>
-          <h3>Audit Trail — Complete History</h3>
-          <div style={{ background: '#09090B', borderRadius: 12, padding: 12, border: '1px solid #27272A', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.8 }}>
-            09:03 — WO assigned by Controller<br/>09:27 — Technician started job<br/>09:29 — GPS recorded (14.2995, 120.9580)<br/>09:42 — Photo captured (camera-only, type: FIBER_REPAIR)<br/>09:51 — Signal measurement -19.4 dBm, DL 287, UL 294, Ping 4 entered<br/>10:05 — WO completed → Smart Next: WO-1001 450m<br/>10:06 — Customer signature captured — Juan Dela Cruz<br/>10:07 — Route optimized — total 12.5km, 4h 20m, score 95.5%<br/>10:08 — Workflow triggered: Auto-notify customer + Sync to Billing API
+          <h3>Audit Trail — Immutable Accountability</h3>
+          <div style={{ background: '#09090B', borderRadius: 12, padding: 14, border: '1px solid #27272A', fontSize: 11, lineHeight: 1.8 }}>
+            Every action: <b>WHO</b> • <b>WHAT</b> • <b>WHEN</b> • <b>WHERE (GPS)</b> • <b>WHY (reason)</b><br/>
+            Example timeline: 09:03 WO assigned → 09:05 Tech accepted → 09:12 En route → 09:31 Arrived → 09:35 Work started → 09:55 Photo captured → 10:01 Signature → 10:05 Completed<br/>
+            Append-only AuditEvent table • IP + device • Before/after values • Correlation ID • GPS coordinates • No delete endpoint
           </div>
         </div>
       )}
