@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole, UserStatus, WoStatus } from '@prisma/client';
+import { UserRole, WoStatus } from '@prisma/client';
 import * as XLSX from 'xlsx';
 import { PrismaService } from '../prisma.service';
 
@@ -72,7 +72,8 @@ export class WorkOrdersService {
     if (!workOrder) throw new NotFoundException('Work order not found');
     if (!team) throw new NotFoundException('Team not found');
     if (team.users.length === 0) throw new BadRequestException('Selected team has no active technicians');
-    if ([WoStatus.WORKING, WoStatus.COMPLETED, WoStatus.CANCELLED].includes(workOrder.status)) throw new BadRequestException(`Cannot assign a ${workOrder.status.toLowerCase()} work order`);
+    const blockedStatuses: WoStatus[] = [WoStatus.WORKING, WoStatus.COMPLETED, WoStatus.CANCELLED];
+    if (blockedStatuses.includes(workOrder.status)) throw new BadRequestException(`Cannot assign a ${workOrder.status.toLowerCase()} work order`);
 
     return this.prisma.$transaction(async (tx) => {
       const current = await tx.assignment.findMany({ where: { workOrderId } });
