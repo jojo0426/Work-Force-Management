@@ -7,30 +7,326 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole { TECHNICIAN JOB_CONTROLLER SUPERVISOR ADMINISTRATOR }
-enum UserStatus { ONLINE WORKING AVAILABLE OFFLINE }
-enum WoType { REPAIR INSTALLATION TRANSFER }
-enum WoStatus { DRAFT ASSIGNED WORKING COMPLETED FB_ISSUE CUST_ISSUE CANCELLED }
+enum UserRole {
+  TECHNICIAN
+  JOB_CONTROLLER
+  SUPERVISOR
+  ADMINISTRATOR
+}
 
-model Team { id String @id @default(uuid()) name String users User[] assignments Assignment[] createdAt DateTime @default(now()) }
-model User { id String @id @default(uuid()) role UserRole teamId String? team Team? @relation(fields:[teamId],references:[id]) name String phone String? email String? @unique passwordHash String? isActive Boolean @default(true) status UserStatus @default(OFFLINE) lastLat Float? lastLng Float? lastLocationAt DateTime? createdAt DateTime @default(now()) }
-model Nap { id String @id @default(uuid()) napCode String @unique address String? lat Float? lng Float? portCount Int @default(16) verified Boolean @default(false) verifiedBy String? verifiedAt DateTime? createdAt DateTime @default(now()) }
-model Subscriber { id String @id @default(uuid()) accountNumber String? @unique name String address String contactNumber String? plan String? lat Float? lng Float? napId String? napPort Int? verified Boolean @default(false) createdAt DateTime @default(now()) }
-model WorkOrder { customerSignatures CustomerSignature[] transfers Transfer[] uploadTickets EvidenceUploadTicket[] id String @id @default(uuid()) woNumber String @unique type WoType status WoStatus @default(DRAFT) subscriberId String? oldNapId String? oldPort Int? newNapId String? newPort Int? priority Int @default(3) remarks String? createdBy String? createdAt DateTime @default(now()) assignments Assignment[] executions JobExecution[] }
-model Assignment { id String @id @default(uuid()) workOrderId String workOrder WorkOrder @relation(fields:[workOrderId],references:[id]) teamId String team Team @relation(fields:[teamId],references:[id]) assignedBy String? assignedAt DateTime @default(now()) @@unique([workOrderId,teamId]) }
-model JobExecution { id String @id @default(uuid()) workOrderId String workOrder WorkOrder @relation(fields:[workOrderId],references:[id]) technicianId String startedAt DateTime @default(now()) completedAt DateTime? findings String? rxPower Float? downloadMbps Int? uploadMbps Int? pingMs Int? napCodeReported String? portReported Int? status WoStatus? photos Photo[] uploadTickets EvidenceUploadTicket[] createdAt DateTime @default(now()) }
-model Photo { id String @id @default(uuid()) executionId String execution JobExecution @relation(fields:[executionId],references:[id]) type String s3Key String @unique url String? lat Float? lng Float? capturedAt DateTime @default(now()) isRequired Boolean @default(true) uploadTicket EvidenceUploadTicket? }
-model EvidenceUploadTicket { id String @id @default(uuid()) workOrderId String workOrder WorkOrder @relation(fields:[workOrderId],references:[id]) executionId String execution JobExecution @relation(fields:[executionId],references:[id]) technicianId String evidenceType String storageKey String @unique contentType String sizeBytes Int provider String status String @default("ISSUED") expiresAt DateTime consumedAt DateTime? photoId String? @unique photo Photo? @relation(fields:[photoId],references:[id]) createdAt DateTime @default(now()) @@index([workOrderId,executionId,technicianId,status]) }
-model LocationLog { id BigInt @id @default(autoincrement()) userId String lat Float lng Float status UserStatus isStale Boolean @default(false) createdAt DateTime @default(now()) @@index([userId,createdAt]) }
-model Mismatch { id String @id @default(uuid()) workOrderId String? type String dbValue String? reportedValue String reportedBy String? status String @default("PENDING") reviewedBy String? reviewedAt DateTime? createdAt DateTime @default(now()) }
-model AuditLog { id BigInt @id @default(autoincrement()) workOrderId String? actorId String? action String details Json? createdAt DateTime @default(now()) }
-model CustomerSignature { id String @id @default(uuid()) workOrderId String workOrder WorkOrder @relation(fields:[workOrderId],references:[id]) executionId String? signatureData String @db.Text signedByName String signedByContact String? signedAt DateTime @default(now()) ipAddress String? deviceInfo Json? isVerified Boolean @default(false) }
-model OptimizedRoute { id String @id @default(uuid()) technicianId String? teamId String? date DateTime routeOrder Json totalDistanceMeters Int? totalDurationMinutes Int? optimizationScore Float? createdAt DateTime @default(now()) }
-model RouteHistory { id BigInt @id @default(autoincrement()) technicianId String lat Float lng Float speedKmh Float? heading Float? createdAt DateTime @default(now()) @@index([technicianId,createdAt]) }
-model AnalyticsSnapshot { id String @id @default(uuid()) snapshotDate DateTime metrics Json createdAt DateTime @default(now()) }
-model WorkflowRule { id String @id @default(uuid()) name String triggerEvent String conditionJson Json? actionType String actionConfig Json isActive Boolean @default(true) createdAt DateTime @default(now()) executions WorkflowExecution[] }
-model WorkflowExecution { id String @id @default(uuid()) ruleId String rule WorkflowRule @relation(fields:[ruleId],references:[id]) workOrderId String? status String @default("PENDING") result Json? createdAt DateTime @default(now()) }
-model NapHealth { id String @id @default(uuid()) napId String? napCode String healthScore Int? portUtilization Float? recentIssuesCount Int @default(0) avgRxPower Float? lastChecked DateTime @default(now()) alerts Json @default("[]") }
-model NetworkAlert { id String @id @default(uuid()) type String napId String? severity String @default("MEDIUM") message String isResolved Boolean @default(false) createdAt DateTime @default(now()) }
-model IntegrationJob { id String @id @default(uuid()) sourceSystem String targetSystem String? payload Json status String @default("PENDING") retries Int @default(0) lastError String? createdAt DateTime @default(now()) processedAt DateTime? }
-model Transfer { id String @id @default(uuid()) workOrderId String workOrder WorkOrder @relation(fields:[workOrderId],references:[id]) oldNapId String? oldPort Int? oldLat Float? oldLng Float? removalEvidence String[] @default([]) newNapId String? newPort Int? newLat Float? newLng Float? installEvidence String[] @default([]) createdAt DateTime @default(now()) }
+enum UserStatus {
+  ONLINE
+  WORKING
+  AVAILABLE
+  OFFLINE
+}
+
+enum WoType {
+  REPAIR
+  INSTALLATION
+  TRANSFER
+}
+
+enum WoStatus {
+  DRAFT
+  ASSIGNED
+  WORKING
+  COMPLETED
+  FB_ISSUE
+  CUST_ISSUE
+  CANCELLED
+}
+
+model Team {
+  id          String       @id @default(uuid())
+  name        String
+  users       User[]
+  assignments Assignment[]
+  createdAt   DateTime     @default(now())
+}
+
+model User {
+  id             String     @id @default(uuid())
+  role           UserRole
+  teamId         String?
+  team           Team?      @relation(fields: [teamId], references: [id])
+  name           String
+  phone          String?
+  email          String?    @unique
+  passwordHash   String?
+  isActive       Boolean    @default(true)
+  status         UserStatus @default(OFFLINE)
+  lastLat        Float?
+  lastLng        Float?
+  lastLocationAt DateTime?
+  createdAt      DateTime   @default(now())
+}
+
+model Nap {
+  id         String   @id @default(uuid())
+  napCode    String   @unique
+  address    String?
+  lat        Float?
+  lng        Float?
+  portCount  Int      @default(16)
+  verified   Boolean  @default(false)
+  verifiedBy String?
+  verifiedAt DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model Subscriber {
+  id            String   @id @default(uuid())
+  accountNumber String?  @unique
+  name          String
+  address       String
+  contactNumber String?
+  plan          String?
+  lat           Float?
+  lng           Float?
+  napId         String?
+  napPort       Int?
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model WorkOrder {
+  id                 String                 @id @default(uuid())
+  woNumber           String                 @unique
+  type               WoType
+  status             WoStatus               @default(DRAFT)
+  subscriberId       String?
+  oldNapId           String?
+  oldPort            Int?
+  newNapId           String?
+  newPort            Int?
+  priority           Int                    @default(3)
+  remarks            String?
+  createdBy          String?
+  createdAt          DateTime               @default(now())
+  assignments        Assignment[]
+  executions         JobExecution[]
+  customerSignatures CustomerSignature[]
+  transfers          Transfer[]
+  uploadTickets      EvidenceUploadTicket[]
+}
+
+model Assignment {
+  id          String    @id @default(uuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  teamId      String
+  team        Team      @relation(fields: [teamId], references: [id])
+  assignedBy  String?
+  assignedAt  DateTime  @default(now())
+
+  @@unique([workOrderId, teamId])
+}
+
+model JobExecution {
+  id              String                 @id @default(uuid())
+  workOrderId     String
+  workOrder       WorkOrder              @relation(fields: [workOrderId], references: [id])
+  technicianId    String
+  startedAt       DateTime               @default(now())
+  completedAt     DateTime?
+  findings        String?
+  rxPower         Float?
+  downloadMbps    Int?
+  uploadMbps      Int?
+  pingMs          Int?
+  napCodeReported String?
+  portReported    Int?
+  status          WoStatus?
+  photos          Photo[]
+  uploadTickets   EvidenceUploadTicket[]
+  createdAt       DateTime               @default(now())
+}
+
+model Photo {
+  id           String                @id @default(uuid())
+  executionId  String
+  execution    JobExecution          @relation(fields: [executionId], references: [id])
+  type         String
+  s3Key        String                @unique
+  url          String?
+  lat          Float?
+  lng          Float?
+  capturedAt   DateTime              @default(now())
+  isRequired   Boolean               @default(true)
+  uploadTicket EvidenceUploadTicket?
+}
+
+model EvidenceUploadTicket {
+  id           String       @id @default(uuid())
+  workOrderId  String
+  workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id])
+  executionId  String
+  execution    JobExecution @relation(fields: [executionId], references: [id])
+  technicianId String
+  evidenceType String
+  storageKey   String       @unique
+  contentType  String
+  sizeBytes    Int
+  provider     String
+  status       String       @default("ISSUED")
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  photoId      String?      @unique
+  photo        Photo?       @relation(fields: [photoId], references: [id])
+  createdAt    DateTime     @default(now())
+
+  @@index([workOrderId, executionId, technicianId, status])
+}
+
+model LocationLog {
+  id        BigInt     @id @default(autoincrement())
+  userId    String
+  lat       Float
+  lng       Float
+  status    UserStatus
+  isStale   Boolean    @default(false)
+  createdAt DateTime   @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Mismatch {
+  id            String   @id @default(uuid())
+  workOrderId   String?
+  type          String
+  dbValue       String?
+  reportedValue String
+  reportedBy    String?
+  status        String   @default("PENDING")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime @default(now())
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  workOrderId String?
+  actorId     String?
+  action      String
+  details     Json?
+  createdAt   DateTime @default(now())
+}
+
+model CustomerSignature {
+  id              String    @id @default(uuid())
+  workOrderId     String
+  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id])
+  executionId     String?
+  signatureData   String    @db.Text
+  signedByName    String
+  signedByContact String?
+  signedAt        DateTime  @default(now())
+  ipAddress       String?
+  deviceInfo      Json?
+  isVerified      Boolean   @default(false)
+}
+
+model OptimizedRoute {
+  id                   String   @id @default(uuid())
+  technicianId         String?
+  teamId               String?
+  date                 DateTime
+  routeOrder           Json
+  totalDistanceMeters  Int?
+  totalDurationMinutes Int?
+  optimizationScore    Float?
+  createdAt            DateTime @default(now())
+}
+
+model RouteHistory {
+  id           BigInt   @id @default(autoincrement())
+  technicianId String
+  lat          Float
+  lng          Float
+  speedKmh     Float?
+  heading      Float?
+  createdAt    DateTime @default(now())
+
+  @@index([technicianId, createdAt])
+}
+
+model AnalyticsSnapshot {
+  id           String   @id @default(uuid())
+  snapshotDate DateTime
+  metrics      Json
+  createdAt    DateTime @default(now())
+}
+
+model WorkflowRule {
+  id           String              @id @default(uuid())
+  name         String
+  triggerEvent String
+  conditionJson Json?
+  actionType   String
+  actionConfig Json
+  isActive     Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  executions   WorkflowExecution[]
+}
+
+model WorkflowExecution {
+  id          String       @id @default(uuid())
+  ruleId      String
+  rule        WorkflowRule @relation(fields: [ruleId], references: [id])
+  workOrderId String?
+  status      String       @default("PENDING")
+  result      Json?
+  createdAt   DateTime     @default(now())
+}
+
+model NapHealth {
+  id                String   @id @default(uuid())
+  napId             String?
+  napCode           String
+  healthScore       Int?
+  portUtilization   Float?
+  recentIssuesCount Int      @default(0)
+  avgRxPower        Float?
+  lastChecked       DateTime @default(now())
+  alerts            Json     @default("[]")
+}
+
+model NetworkAlert {
+  id         String   @id @default(uuid())
+  type       String
+  napId      String?
+  severity   String   @default("MEDIUM")
+  message    String
+  isResolved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model IntegrationJob {
+  id           String    @id @default(uuid())
+  sourceSystem String
+  targetSystem String?
+  payload      Json
+  status       String    @default("PENDING")
+  retries      Int       @default(0)
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  processedAt  DateTime?
+}
+
+model Transfer {
+  id              String    @id @default(uuid())
+  workOrderId     String
+  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id])
+  oldNapId        String?
+  oldPort         Int?
+  oldLat          Float?
+  oldLng          Float?
+  removalEvidence String[]  @default([])
+  newNapId        String?
+  newPort         Int?
+  newLat          Float?
+  newLng          Float?
+  installEvidence String[]  @default([])
+  createdAt       DateTime  @default(now())
+}
