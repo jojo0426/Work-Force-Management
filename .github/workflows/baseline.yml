@@ -48,6 +48,8 @@ jobs:
         run: npm run prisma:migrate:deploy
       - name: Run database-backed operational E2E
         run: npm run test:database-e2e
+      - name: Run database-backed field exception lifecycle E2E
+        run: npm run test:field-exception-database-e2e
       - run: npm run test:security
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
