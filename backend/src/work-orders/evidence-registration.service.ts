@@ -20,11 +20,19 @@ export class EvidenceRegistrationService {
       const current=await tx.evidenceUploadTicket.findUnique({where:{id:ticket.id}});
       if(!current||current.status!=='ISSUED'||current.consumedAt)throw new BadRequestException('Evidence upload ticket has already been consumed');
       if(current.expiresAt.getTime()<Date.now())throw new BadRequestException('Evidence upload ticket has expired');
+
+      const previous=await tx.photo.findFirst({where:{executionId:input.executionId,type:input.type,isRequired:true},orderBy:{capturedAt:'desc'}});
       const photo=await tx.photo.create({data:{executionId:input.executionId,type:input.type,s3Key:current.storageKey,url:input.url||null,lat:input.lat,lng:input.lng,capturedAt:input.capturedAt,isRequired:true}});
       const consumed=await tx.evidenceUploadTicket.updateMany({where:{id:current.id,status:'ISSUED',consumedAt:null},data:{status:'CONSUMED',consumedAt:new Date(),photoId:photo.id}});
       if(consumed.count!==1)throw new BadRequestException('Evidence upload ticket could not be consumed');
-      await tx.auditLog.create({data:{workOrderId:input.workOrderId,actorId:input.technicianId,action:'WORK_ORDER_EVIDENCE_ADDED',details:{executionId:input.executionId,photoId:photo.id,ticketId:current.id,type:photo.type,storageKey:current.storageKey,captureSource:'CAMERA',capturedAt:input.capturedAt.toISOString(),storageVerified:true}}});
-      return{evidence:photo,ticket:{id:current.id,status:'CONSUMED'},storageVerified:true};
+
+      if(previous){
+        await tx.photo.update({where:{id:previous.id},data:{isRequired:false}});
+        await tx.auditLog.create({data:{workOrderId:input.workOrderId,actorId:input.technicianId,action:'WORK_ORDER_EVIDENCE_REPLACED',details:{executionId:input.executionId,type:input.type,previousPhotoId:previous.id,previousStorageKey:previous.s3Key,replacementPhotoId:photo.id,replacementStorageKey:photo.s3Key,ticketId:current.id,capturedAt:input.capturedAt.toISOString(),storageVerified:true}}});
+      }else{
+        await tx.auditLog.create({data:{workOrderId:input.workOrderId,actorId:input.technicianId,action:'WORK_ORDER_EVIDENCE_ADDED',details:{executionId:input.executionId,photoId:photo.id,ticketId:current.id,type:photo.type,storageKey:current.storageKey,captureSource:'CAMERA',capturedAt:input.capturedAt.toISOString(),storageVerified:true}}});
+      }
+      return{evidence:photo,replacedEvidence:previous?{id:previous.id,storageKey:previous.s3Key}:null,ticket:{id:current.id,status:'CONSUMED'},storageVerified:true};
     });
   }
 }
