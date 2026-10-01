@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:auth-contract": "node scripts/auth-contract.mjs"
+    "test:auth-contract": "node scripts/auth-contract.mjs && node scripts/operations-contract.mjs",
+    "test:operations-contract": "node scripts/operations-contract.mjs"
   },
   "dependencies": {
     "next": "16.3.8",
