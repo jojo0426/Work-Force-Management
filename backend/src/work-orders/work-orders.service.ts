@@ -9,7 +9,9 @@ export class WorkOrdersService {
 
   async parseExcel(buffer: Buffer) {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    // ExcelJS currently declares its input Buffer against an older Node Buffer generic.
+    // The runtime value from Multer is valid; isolate the compatibility cast here.
+    await workbook.xlsx.load(buffer as any);
     const sheet = workbook.worksheets[0];
     if (!sheet) throw new BadRequestException('Excel workbook does not contain a worksheet');
     const headerRow = sheet.getRow(1);
