@@ -4,6 +4,7 @@ export type SessionUser = { id: string; email: string; name: string; role: strin
 export type Session = { token: string; user: SessionUser };
 export type EvidenceUploadTicketRequest = { type: string; captureSource: 'CAMERA'; contentType: 'image/jpeg'|'image/png'|'image/webp'; sizeBytes: number; originalName?: string };
 export type EvidenceUploadTicket = { ticketId: string; storageKey: string; provider: string; uploadMode: string; expiresAt: string; maxBytes: number; allowedContentTypes: string[]; uploadUrl?: string; method?: string; headers?: Record<string,string>; fields?: Record<string,string> };
+export type FieldExceptionReason='CUSTOMER_UNAVAILABLE'|'SITE_INACCESSIBLE'|'UNSAFE_CONDITION'|'WRONG_ADDRESS_OR_DETAILS'|'RESCHEDULE_REQUESTED'|'NEEDS_CONTROLLER_SUPPORT';
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const data = await response.json().catch(() => ({}));
@@ -26,6 +27,7 @@ async function authenticated<T>(token: string, path: string, init: RequestInit =
 export async function getMe(token: string) { return authenticated<{ user: SessionUser }>(token, '/auth/me'); }
 export async function getAssignedWorkOrders(token: string) { return authenticated<{ data: any[] }>(token, '/work-orders'); }
 export async function startWorkOrder(token: string, workOrderId: string) { return authenticated<any>(token, `/work-orders/${encodeURIComponent(workOrderId)}/start`, { method: 'POST' }); }
+export async function reportFieldException(token:string,workOrderId:string,payload:{reason:FieldExceptionReason;notes?:string;lat?:number|null;lng?:number|null}) { return authenticated<any>(token,`/work-orders/${encodeURIComponent(workOrderId)}/exception`,{method:'POST',body:JSON.stringify(payload)}); }
 export async function createEvidenceUploadTicket(token: string, workOrderId: string, payload: EvidenceUploadTicketRequest) { return authenticated<EvidenceUploadTicket>(token, `/work-orders/${encodeURIComponent(workOrderId)}/evidence/upload-ticket`, { method: 'POST', body: JSON.stringify(payload) }); }
 
 export async function uploadEvidenceToTicket(ticket: EvidenceUploadTicket, localUri: string, contentType: EvidenceUploadTicketRequest['contentType']) {
