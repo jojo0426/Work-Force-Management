@@ -6,16 +6,23 @@ const controllerPath = path.join(__dirname, 'reports.controller.ts');
 const service = fs.readFileSync(servicePath, 'utf8');
 const controller = fs.readFileSync(controllerPath, 'utf8');
 
+// Normalize formatting so this regression gate validates behavior-bearing source
+// patterns without breaking on harmless whitespace/refactoring changes.
+const compact = service.replace(/\s+/g, '');
+
 const checks: Array<[string, boolean]> = [
   ['custom range validates missing dates', service.includes('Custom reports require both from and to dates')],
   ['custom range validates invalid dates', service.includes('Invalid custom report date range')],
   ['custom range validates reversed dates', service.includes('Report from date must not be after to date')],
-  ['draft included in backlog', service.includes('draft + assigned + working + onHold + fbIssue + custIssue')],
-  ['on hold included in summary', service.includes("status: 'ON_HOLD'")],
-  ['completion rate guarded against zero total', service.includes('total > 0')],
-  ['average completion requires start timestamp', service.includes('started_at IS NOT NULL')],
-  ['Excel WO export is range scoped', service.includes('workOrder.findMany({ where: reportWhere')],
-  ['Excel audit export is range scoped', service.includes('auditLog.findMany({ where: reportWhere')],
+  ['draft included in backlog', compact.includes('draft+assigned+working+onHold+fbIssue+custIssue')],
+  ['on hold included in summary', compact.includes("status:'ON_HOLD'") && compact.includes('onHold')],
+  ['completion rate guarded against zero total', compact.includes('total>0?') && compact.includes(':0')],
+  ['average completion requires start timestamp', compact.includes('started_atISNOTNULL')],
+  ['Excel WO export is range scoped', compact.includes('workOrder.findMany({where:reportWhere')],
+  ['Excel audit export is range scoped', compact.includes('auditLog.findMany({where:reportWhere')],
+  ['team reporting selects latest assignment only', compact.includes("orderBy:{assignedAt:'desc'},take:1")],
+  ['team workload uses latest assignment rather than assignment history', compact.includes("w.assignments[0]?.teamId===team.id")],
+  ['team backlog includes operational unresolved states', compact.includes("['DRAFT','ASSIGNED','WORKING','ON_HOLD','FB_ISSUE','CUST_ISSUE'].includes(w.status)")],
   ['report routes remain management restricted', controller.includes('UserRole.JOB_CONTROLLER') && controller.includes('UserRole.SUPERVISOR') && controller.includes('UserRole.ADMINISTRATOR')],
 ];
 
