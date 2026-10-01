@@ -3,15 +3,18 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole, WoStatus, WoType } from '@prisma/client';
 import { WorkOrdersService } from './work-orders.service';
 import { WorkOrdersPhase2Service } from './work-orders-phase2.service';
+import { EvidenceStorageService } from './evidence-storage.service';
 import { PrismaService } from '../prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
+const EVIDENCE_TYPES = ['WORK_RESULT', 'SPEEDTEST', 'FB_ISSUE', 'CUST_ISSUE', 'INSTALLATION', 'TRANSFER_REMOVAL', 'TRANSFER_INSTALL'];
+
 @Controller('work-orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class WorkOrdersController {
-  constructor(private svc: WorkOrdersService, private phase2: WorkOrdersPhase2Service, private prisma: PrismaService) {}
+  constructor(private svc: WorkOrdersService, private phase2: WorkOrdersPhase2Service, private prisma: PrismaService, private evidenceStorage: EvidenceStorageService) {}
 
   @Post('upload')
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
@@ -71,6 +74,26 @@ export class WorkOrdersController {
     });
   }
 
+  @Post(':id/evidence/upload-ticket')
+  @Roles(UserRole.TECHNICIAN)
+  async createEvidenceUploadTicket(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    const type = String(body.type || '').trim().toUpperCase();
+    if (!EVIDENCE_TYPES.includes(type)) throw new BadRequestException('Unsupported evidence type');
+    if (body.captureSource !== 'CAMERA') throw new BadRequestException('Evidence upload tickets are restricted to in-app camera captures');
+    const contentType = String(body.contentType || '').trim().toLowerCase();
+    const sizeBytes = Number(body.sizeBytes);
+    const technician = await this.prisma.user.findUnique({ where: { id: req.user.id }, select: { id: true, teamId: true, isActive: true } });
+    if (!technician?.isActive) throw new ForbiddenException('Technician account is inactive');
+    if (!technician.teamId) throw new ForbiddenException('Technician is not assigned to a team');
+    const workOrder = await this.prisma.workOrder.findUnique({ where: { id }, include: { assignments: true } });
+    if (!workOrder) throw new NotFoundException('Work order not found');
+    if (workOrder.status !== WoStatus.WORKING) throw new BadRequestException('Evidence can only be uploaded for a working work order');
+    if (!workOrder.assignments.some((assignment) => assignment.teamId === technician.teamId)) throw new ForbiddenException('Work order is not assigned to your team');
+    const execution = await this.prisma.jobExecution.findFirst({ where: { workOrderId: id, technicianId: technician.id, completedAt: null }, orderBy: { startedAt: 'desc' } });
+    if (!execution) throw new ForbiddenException('No active execution belongs to this technician for the work order');
+    return this.evidenceStorage.createUploadTicket({ workOrderId: id, executionId: execution.id, technicianId: technician.id, evidenceType: type, contentType, sizeBytes, originalName: body.originalName ? String(body.originalName) : undefined });
+  }
+
   @Post(':id/evidence')
   @Roles(UserRole.TECHNICIAN)
   async addEvidence(@Req() req: any, @Param('id') id: string, @Body() body: any) {
@@ -80,8 +103,7 @@ export class WorkOrdersController {
     if (!workOrder || workOrder.status !== WoStatus.WORKING) throw new BadRequestException('Evidence can only be added to a working work order');
     if (body.captureSource !== 'CAMERA') throw new BadRequestException('Evidence must be captured using the in-app camera');
     if (!body.s3Key || !body.type || !body.capturedAt) throw new BadRequestException('Evidence type, capture timestamp, and uploaded storage key are required');
-    const allowedTypes = ['WORK_RESULT', 'SPEEDTEST', 'FB_ISSUE', 'CUST_ISSUE', 'INSTALLATION', 'TRANSFER_REMOVAL', 'TRANSFER_INSTALL'];
-    if (!allowedTypes.includes(String(body.type))) throw new BadRequestException('Unsupported evidence type');
+    if (!EVIDENCE_TYPES.includes(String(body.type))) throw new BadRequestException('Unsupported evidence type');
     const capturedAt = new Date(body.capturedAt);
     if (Number.isNaN(capturedAt.getTime())) throw new BadRequestException('Evidence capture timestamp is invalid');
     const now = Date.now();
@@ -110,41 +132,19 @@ export class WorkOrdersController {
     const technician = await this.prisma.user.findUnique({ where: { id: req.user.id }, select: { teamId: true, isActive: true } });
     if (!technician?.isActive || !technician.teamId || !workOrder.assignments.some((a) => a.teamId === technician.teamId)) throw new ForbiddenException('Technician is not authorized to finish this work order');
     if (!String(body.findings || '').trim()) throw new BadRequestException('Findings are required before finishing a work order');
-
     const evidenceTypes = new Set(execution.photos.map((p) => p.type));
     const requiredEvidence = new Set<string>();
     if (finalStatus === WoStatus.COMPLETED) {
       requiredEvidence.add(workOrder.type === WoType.INSTALLATION ? 'INSTALLATION' : 'WORK_RESULT');
-      if (workOrder.type === WoType.TRANSFER) {
-        requiredEvidence.delete('WORK_RESULT');
-        requiredEvidence.add('TRANSFER_REMOVAL');
-        requiredEvidence.add('TRANSFER_INSTALL');
-      }
-    } else {
-      requiredEvidence.add(finalStatus);
-    }
-
+      if (workOrder.type === WoType.TRANSFER) { requiredEvidence.delete('WORK_RESULT'); requiredEvidence.add('TRANSFER_REMOVAL'); requiredEvidence.add('TRANSFER_INSTALL'); }
+    } else requiredEvidence.add(finalStatus);
     const resultCode = String(body.resultCode || '').trim().toUpperCase();
-    const speedTestResultCodes = new Set(['SLOW_BROWSING', 'SPEED_NOT_MET', 'INTERMITTENT_SPEED']);
-    const speedTestRequired = speedTestResultCodes.has(resultCode);
+    const speedTestRequired = new Set(['SLOW_BROWSING', 'SPEED_NOT_MET', 'INTERMITTENT_SPEED']).has(resultCode);
     if (speedTestRequired) requiredEvidence.add('SPEEDTEST');
-    for (const requiredType of requiredEvidence) {
-      if (!evidenceTypes.has(requiredType)) throw new BadRequestException(`${requiredType} camera evidence is required before setting status to ${finalStatus}`);
-    }
-
-    const numberOrNull = (value: any, field: string, min: number, max: number) => {
-      if (value == null || value === '') return null;
-      const parsed = Number(value);
-      if (!Number.isFinite(parsed) || parsed < min || parsed > max) throw new BadRequestException(`${field} is outside the allowed range`);
-      return parsed;
-    };
-    const rxPower = numberOrNull(body.rxPower, 'rxPower', -60, 20);
-    const downloadMbps = numberOrNull(body.downloadMbps, 'downloadMbps', 0, 100000);
-    const uploadMbps = numberOrNull(body.uploadMbps, 'uploadMbps', 0, 100000);
-    const pingMs = numberOrNull(body.pingMs, 'pingMs', 0, 600000);
-    const portReported = numberOrNull(body.portReported, 'portReported', 1, 100000);
+    for (const requiredType of requiredEvidence) if (!evidenceTypes.has(requiredType)) throw new BadRequestException(`${requiredType} camera evidence is required before setting status to ${finalStatus}`);
+    const numberOrNull = (value: any, field: string, min: number, max: number) => { if (value == null || value === '') return null; const parsed = Number(value); if (!Number.isFinite(parsed) || parsed < min || parsed > max) throw new BadRequestException(`${field} is outside the allowed range`); return parsed; };
+    const rxPower = numberOrNull(body.rxPower, 'rxPower', -60, 20), downloadMbps = numberOrNull(body.downloadMbps, 'downloadMbps', 0, 100000), uploadMbps = numberOrNull(body.uploadMbps, 'uploadMbps', 0, 100000), pingMs = numberOrNull(body.pingMs, 'pingMs', 0, 600000), portReported = numberOrNull(body.portReported, 'portReported', 1, 100000);
     if (speedTestRequired && (downloadMbps == null || uploadMbps == null || pingMs == null)) throw new BadRequestException('Download, upload, and ping measurements are required for speed-related results');
-
     return this.prisma.$transaction(async (tx) => {
       const finishedExecution = await tx.jobExecution.update({ where: { id: execution.id }, data: { completedAt: new Date(), findings: String(body.findings).trim(), rxPower, downloadMbps, uploadMbps, pingMs, napCodeReported: body.napCodeReported || null, portReported, status: finalStatus } });
       const updated = await tx.workOrder.update({ where: { id }, data: { status: finalStatus } });
@@ -157,46 +157,24 @@ export class WorkOrdersController {
   @Get('dispatch/teams')
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   async dispatchTeams() { return { teams: await this.svc.listEligibleTeams() }; }
-
   @Post(':id/assign')
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
-  async assign(@Req() req: any, @Param('id') id: string, @Body() body: { teamId: string }) {
-    if (!body.teamId) throw new BadRequestException('teamId is required');
-    return this.svc.assignToTeam(id, body.teamId, req.user.id);
-  }
-
+  async assign(@Req() req: any, @Param('id') id: string, @Body() body: { teamId: string }) { if (!body.teamId) throw new BadRequestException('teamId is required'); return this.svc.assignToTeam(id, body.teamId, req.user.id); }
   @Get('nearby')
   @Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
-  async nearby(@Query('lat') lat: string, @Query('lng') lng: string, @Query('radius') radius?: string) {
-    const r = radius ? parseInt(radius) : 3000;
-    return this.svc.findNearbyTechnicians(parseFloat(lat), parseFloat(lng), r);
-  }
-
+  async nearby(@Query('lat') lat: string, @Query('lng') lng: string, @Query('radius') radius?: string) { const r = radius ? parseInt(radius) : 3000; return this.svc.findNearbyTechnicians(parseFloat(lat), parseFloat(lng), r); }
   @Get('smart-next')
   @Roles(UserRole.TECHNICIAN, UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
-  async smartNext(@Req() req: any, @Query('technicianId') techId: string, @Query('lat') lat: string, @Query('lng') lng: string) {
-    const technicianId = req.user.role === UserRole.TECHNICIAN ? req.user.id : techId;
-    if (!technicianId) throw new BadRequestException('technicianId is required for management requests');
-    const currentLat = Number(lat); const currentLng = Number(lng);
-    if (!Number.isFinite(currentLat) || !Number.isFinite(currentLng)) throw new BadRequestException('Current technician latitude and longitude are required');
-    return this.phase2.suggestNextJob(technicianId, currentLat, currentLng);
-  }
-
+  async smartNext(@Req() req: any, @Query('technicianId') techId: string, @Query('lat') lat: string, @Query('lng') lng: string) { const technicianId = req.user.role === UserRole.TECHNICIAN ? req.user.id : techId; if (!technicianId) throw new BadRequestException('technicianId is required for management requests'); const currentLat = Number(lat), currentLng = Number(lng); if (!Number.isFinite(currentLat) || !Number.isFinite(currentLng)) throw new BadRequestException('Current technician latitude and longitude are required'); return this.phase2.suggestNextJob(technicianId, currentLat, currentLng); }
   @Get('nap/:code/location')
   @Roles(UserRole.TECHNICIAN, UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   async napLocation(@Param('code') code: string) { return this.phase2.getVerifiedLocation(code); }
-
   @Post('transfer')
   @Roles(UserRole.TECHNICIAN, UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   async createTransfer(@Body() body: any) { return this.phase2.createTransfer(body); }
-
   @Get('mismatches/pending')
   @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
-  async pendingMismatches() {
-    const data = await this.prisma.mismatch.findMany({ where: { status: 'PENDING' }, take: 50 });
-    return { data, workflow: 'REPORT MISMATCH -> Supervisor Review -> Verify -> Approve/Reject' };
-  }
-
+  async pendingMismatches() { const data = await this.prisma.mismatch.findMany({ where: { status: 'PENDING' }, take: 50 }); return { data, workflow: 'REPORT MISMATCH -> Supervisor Review -> Verify -> Approve/Reject' }; }
   @Post('mismatches/:id/review')
   @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
   async reviewMismatch(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.phase2.reviewMismatch(id, body.decision, req.user.id); }
