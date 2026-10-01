@@ -1,6 +1,7 @@
 import { BadRequestException, Controller, Get, Post, Body, Query, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { Phase4Service } from './phase4.service';
+import { LiveOperationsService } from './live-operations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -8,7 +9,11 @@ import { Roles } from '../auth/roles.decorator';
 @Controller('phase4')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class Phase4Controller {
-  constructor(private phase4: Phase4Service) {}
+  constructor(private phase4: Phase4Service, private liveOperations: LiveOperationsService) {}
+
+  @Get('operations/live')
+  @Roles(UserRole.JOB_CONTROLLER,UserRole.SUPERVISOR,UserRole.ADMINISTRATOR)
+  async liveOperationsSnapshot(){return this.liveOperations.snapshot();}
 
   @Post('signature')
   @Roles(UserRole.TECHNICIAN)
