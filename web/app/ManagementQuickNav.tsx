@@ -14,8 +14,9 @@ export default function ManagementQuickNav() {
   if (!authorized) return null;
 
   return (
-    <nav aria-label="Management navigation" style={{position:'fixed',right:16,bottom:16,zIndex:1000,display:'flex',gap:8,padding:8,border:'1px solid #3F3F46',borderRadius:12,background:'#18181B',boxShadow:'0 8px 24px rgba(0,0,0,.35)'}}>
+    <nav aria-label="Management navigation" style={{position:'fixed',right:16,bottom:16,zIndex:1000,display:'flex',gap:8,padding:8,border:'1px solid #3F3F46',borderRadius:12,background:'#18181B',boxShadow:'0 8px 24px rgba(0,0,0,.35)',flexWrap:'wrap'}}>
       <a href="/" style={linkStyle}>Management</a>
+      <a href="/reports" style={linkStyle}>Supervisor KPIs</a>
       <a href="/operations" style={{...linkStyle,background:'#F59E0B',color:'#111827',borderColor:'#F59E0B'}}>Live Operations</a>
     </nav>
   );
