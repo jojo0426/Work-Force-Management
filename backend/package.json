@@ -15,6 +15,7 @@
     "test:import-concurrency": "ts-node src/work-orders/import-concurrency-selftest.ts",
     "test:operational-e2e": "ts-node src/work-orders/operational-e2e-selftest.ts",
     "test:database-e2e": "ts-node src/work-orders/database-e2e-selftest.ts",
+    "test:field-exception-database-e2e": "ts-node src/work-orders/field-exception-database-e2e.ts",
     "test:client-contract": "ts-node src/work-orders/client-server-contract-selftest.ts",
     "test:field-exception-lifecycle": "ts-node src/work-orders/field-exception-lifecycle-selftest.ts",
     "test:phase4": "ts-node src/phase4/phase4-selftest.ts",
