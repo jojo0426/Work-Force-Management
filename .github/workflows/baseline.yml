@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - run: npm ci
+      - run: npm install --no-fund
       - run: npm run prisma:generate
       - run: npx prisma validate
       - run: npm run test:security
@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - run: npm ci
+      - run: npm install --no-fund
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
@@ -60,6 +60,6 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - run: npm ci
+      - run: npm install --no-fund
       - run: npx tsc --noEmit
       - run: npm audit --omit=dev --audit-level=high
