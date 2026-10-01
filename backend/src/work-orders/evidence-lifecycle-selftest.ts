@@ -12,7 +12,7 @@ function harness(overrides:Partial<Ticket>={},objectOverride:any={}){
   evidenceUploadTicket:{findUnique:async({where}:any)=>where.id===ticket.id?ticket:null,updateMany:async({where,data}:any)=>{if(where.id!==ticket.id||ticket.status!==where.status)return{count:0};Object.assign(ticket,data);return{count:1};}},
   $transaction:async(fn:any)=>fn({
    evidenceUploadTicket:{findUnique:async()=>ticket,updateMany:async({where,data}:any)=>{if(ticket.status!==where.status||ticket.consumedAt!==null)return{count:0};Object.assign(ticket,data);return{count:1};}},
-   photo:{findFirst:async()=>photos.filter(p=>p.executionId==='exec-1'&&p.type==='WORK_RESULT'&&p.isRequired).at(-1)||null,create:async({data}:any)=>{const p={id:`photo-${photos.length+1}`,...data};photos.push(p);return p;},update:async({where,data}:any)=>{const p=photos.find(x=>x.id===where.id);Object.assign(p,data);return p;}},
+   photo:{findFirst:async()=>{const matches=photos.filter(p=>p.executionId==='exec-1'&&p.type==='WORK_RESULT'&&p.isRequired);return matches.length?matches[matches.length-1]:null;},create:async({data}:any)=>{const p={id:`photo-${photos.length+1}`,...data};photos.push(p);return p;},update:async({where,data}:any)=>{const p=photos.find(x=>x.id===where.id);Object.assign(p,data);return p;}},
    auditLog:{create:async({data}:any)=>{audits.push(data);return data;}}
   })
  };
