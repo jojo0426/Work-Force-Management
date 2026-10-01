@@ -1,20 +1,41 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, UserRole, WoStatus } from '@prisma/client';
-import * as XLSX from 'xlsx';
+import * as ExcelJS from '@andreeewill/exceljs';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class WorkOrdersService {
   constructor(private prisma: PrismaService) {}
 
-  parseExcel(buffer: Buffer) {
-    const wb = XLSX.read(buffer, { type: 'buffer' }); const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows:any[] = XLSX.utils.sheet_to_json(sheet,{defval:''});
+  async parseExcel(buffer: Buffer) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.worksheets[0];
+    if (!sheet) throw new BadRequestException('Excel workbook does not contain a worksheet');
+    const headerRow = sheet.getRow(1);
+    const headers: string[] = [];
+    headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      headers[colNumber] = String(cell.text || cell.value || '').trim().toUpperCase();
+    });
+    const rows: any[] = [];
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const record: Record<string, any> = {};
+      let hasValue = false;
+      headers.forEach((header, colNumber) => {
+        if (!header || colNumber === 0) return;
+        const cell = row.getCell(colNumber);
+        const value = cell.text || (cell.value == null ? '' : String(cell.value));
+        if (String(value).trim()) hasValue = true;
+        record[header] = value;
+      });
+      if (hasValue) rows.push(record);
+    });
     const requiredColumns=['ACCOUNT NUMBER','NAME','ADDRESS','CONTACT NUMBER','PLAN','JOB ORDER'];
-    const actualColumns=rows.length?Object.keys(rows[0]).map(k=>k.toString().trim().toUpperCase()):[];
+    const actualColumns=headers.filter(Boolean);
     const missingColumns=requiredColumns.filter(c=>!actualColumns.includes(c));
     if(missingColumns.length)return{total:rows.length,valid:0,invalid:rows.length,requiredColumns,missingColumns,templateValid:false,preview:[],all:[]};
-    const parsed=rows.map((r,idx)=>{const errors:string[]=[];const n:Record<string,any>={};for(const[k,v]of Object.entries(r))n[k.trim().toUpperCase()]=v;const p:any={row:idx+2,accountNumber:String(n['ACCOUNT NUMBER']??'').trim(),name:String(n['NAME']??'').trim(),address:String(n['ADDRESS']??'').trim(),contactNumber:String(n['CONTACT NUMBER']??'').trim(),plan:String(n['PLAN']??'').trim(),jobOrder:String(n['JOB ORDER']??'').trim(),errors};if(!p.accountNumber)errors.push('Missing account number');if(!p.name)errors.push('Missing name');if(!p.address)errors.push('Missing address');if(!p.contactNumber)errors.push('Missing contact number');if(!p.plan)errors.push('Missing plan');if(!p.jobOrder)errors.push('Missing job order');p.valid=!errors.length;return p;});
+    const parsed=rows.map((r,idx)=>{const errors:string[]=[];const p:any={row:idx+2,accountNumber:String(r['ACCOUNT NUMBER']??'').trim(),name:String(r['NAME']??'').trim(),address:String(r['ADDRESS']??'').trim(),contactNumber:String(r['CONTACT NUMBER']??'').trim(),plan:String(r['PLAN']??'').trim(),jobOrder:String(r['JOB ORDER']??'').trim(),errors};if(!p.accountNumber)errors.push('Missing account number');if(!p.name)errors.push('Missing name');if(!p.address)errors.push('Missing address');if(!p.contactNumber)errors.push('Missing contact number');if(!p.plan)errors.push('Missing plan');if(!p.jobOrder)errors.push('Missing job order');p.valid=!errors.length;return p;});
     const ac=new Map<string,number>(),jc=new Map<string,number>();for(const p of parsed){if(p.accountNumber)ac.set(p.accountNumber,(ac.get(p.accountNumber)||0)+1);if(p.jobOrder)jc.set(p.jobOrder,(jc.get(p.jobOrder)||0)+1);}for(const p of parsed){if(p.accountNumber&&(ac.get(p.accountNumber)||0)>1)p.errors.push('Duplicate account number in uploaded file');if(p.jobOrder&&(jc.get(p.jobOrder)||0)>1)p.errors.push('Duplicate job order in uploaded file');p.valid=!p.errors.length;}const valid=parsed.filter(p=>p.valid).length;return{total:rows.length,valid,invalid:rows.length-valid,requiredColumns,missingColumns:[],templateValid:true,preview:parsed.slice(0,50),all:parsed};
   }
   async prepareImportPreview(parsed:any[]){if(!Array.isArray(parsed))throw new BadRequestException('workOrders must be an array');const validRows=parsed.filter(p=>p.valid);const jobOrders:string[]=[...new Set<string>(validRows.map(p=>String(p.jobOrder||'')).filter(Boolean))],accountNumbers:string[]=[...new Set<string>(validRows.map(p=>String(p.accountNumber||'')).filter(Boolean))];const[existingWorkOrders,existingSubscribers]=await Promise.all([jobOrders.length?this.prisma.workOrder.findMany({where:{woNumber:{in:jobOrders}},select:{id:true,woNumber:true,status:true}}):[],accountNumbers.length?this.prisma.subscriber.findMany({where:{accountNumber:{in:accountNumbers}},select:{id:true,accountNumber:true,name:true}}):[]]);const wm=new Map(existingWorkOrders.map(wo=>[wo.woNumber,wo] as const)),sm=new Map(existingSubscribers.map(s=>[s.accountNumber,s] as const));const rows=parsed.map(p=>{const ew=p.jobOrder?wm.get(String(p.jobOrder)):undefined,es=p.accountNumber?sm.get(String(p.accountNumber)):undefined;const action=!p.valid?'INVALID':ew?'SKIP_DUPLICATE_JOB_ORDER':es?'UPDATE_SUBSCRIBER_AND_CREATE_WORK_ORDER':'CREATE_SUBSCRIBER_AND_WORK_ORDER';return{...p,action,existingWorkOrder:ew||null,existingSubscriber:es||null};});return{summary:{totalRows:rows.length,invalidRows:rows.filter(r=>r.action==='INVALID').length,duplicateJobOrders:rows.filter(r=>r.action==='SKIP_DUPLICATE_JOB_ORDER').length,subscribersToUpdate:rows.filter(r=>r.action==='UPDATE_SUBSCRIBER_AND_CREATE_WORK_ORDER').length,subscribersToCreate:rows.filter(r=>r.action==='CREATE_SUBSCRIBER_AND_WORK_ORDER').length,workOrdersToCreate:rows.filter(r=>r.action==='UPDATE_SUBSCRIBER_AND_CREATE_WORK_ORDER'||r.action==='CREATE_SUBSCRIBER_AND_WORK_ORDER').length},rows};}
