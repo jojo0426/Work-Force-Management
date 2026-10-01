@@ -9,12 +9,46 @@ export type EvidenceType =
   | 'TRANSFER_REMOVAL'
   | 'TRANSFER_INSTALL';
 
+export type WorkOrderType = 'REPAIR' | 'INSTALLATION' | 'TRANSFER';
+export type FinalStatus = 'COMPLETED' | 'FB_ISSUE' | 'CUST_ISSUE';
+export type ResultCode = 'NORMAL' | 'SLOW_BROWSING' | 'SPEED_NOT_MET' | 'INTERMITTENT_SPEED';
+
 export type CapturedEvidence = {
   localUri: string;
   type: EvidenceType;
   capturedAt: string;
   captureSource: 'CAMERA';
 };
+
+const SPEED_RESULT_CODES = new Set<ResultCode>(['SLOW_BROWSING', 'SPEED_NOT_MET', 'INTERMITTENT_SPEED']);
+
+export function getRequiredEvidenceTypes(
+  workOrderType: WorkOrderType,
+  finalStatus: FinalStatus,
+  resultCode: ResultCode,
+): EvidenceType[] {
+  if (finalStatus === 'FB_ISSUE') return ['FB_ISSUE'];
+  if (finalStatus === 'CUST_ISSUE') return ['CUST_ISSUE'];
+
+  const required: EvidenceType[] =
+    workOrderType === 'INSTALLATION'
+      ? ['INSTALLATION']
+      : workOrderType === 'TRANSFER'
+        ? ['TRANSFER_REMOVAL', 'TRANSFER_INSTALL']
+        : ['WORK_RESULT'];
+
+  if (SPEED_RESULT_CODES.has(resultCode)) required.push('SPEEDTEST');
+  return required;
+}
+
+export function getMissingEvidenceTypes(required: EvidenceType[], captured: EvidenceType[]) {
+  const capturedSet = new Set(captured);
+  return required.filter((type) => !capturedSet.has(type));
+}
+
+export function requiresSpeedMeasurements(resultCode: ResultCode) {
+  return SPEED_RESULT_CODES.has(resultCode);
+}
 
 /**
  * Phase 3 evidence guard.
