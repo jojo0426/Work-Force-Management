@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import * as XLSX from 'xlsx';
-import * as fs from 'fs';
+import * as ExcelJS from '@andreeewill/exceljs';
 
 @Injectable()
 export class ReportsPhase3Service {
@@ -38,7 +37,6 @@ export class ReportsPhase3Service {
       this.prisma.workOrder.count({ where: { ...where, type: 'TRANSFER' } }),
     ]);
 
-    // Technician performance
     const techPerformance = await this.prisma.jobExecution.groupBy({
       by: ['technicianId'],
       where: { createdAt: { gte: startDate, lte: endDate } },
@@ -46,7 +44,6 @@ export class ReportsPhase3Service {
       _avg: { downloadMbps: true, uploadMbps: true }
     });
 
-    // Average completion time from audit logs
     const avgCompletion = await this.prisma.$queryRaw`
       SELECT AVG(EXTRACT(EPOCH FROM (completed_at - started_at))/3600) as avg_hours
       FROM job_executions WHERE completed_at IS NOT NULL AND created_at >= ${startDate} AND created_at <= ${endDate}
@@ -67,10 +64,19 @@ export class ReportsPhase3Service {
     const wos = await this.prisma.workOrder.findMany({ take: 2000, orderBy: { createdAt: 'desc' } });
     const audit = await this.prisma.auditLog.findMany({ take: 1000, orderBy: { createdAt: 'desc' } });
 
-    const wb = XLSX.utils.book_new();
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'FiberBlaze WFM';
+    wb.created = new Date();
 
-    // Sheet 1: Summary
-    const summarySheet = XLSX.utils.json_to_sheet([
+    const addObjectRows = (sheet: ExcelJS.Worksheet, headers: string[], rows: Array<Record<string, unknown>>) => {
+      sheet.addRow(headers);
+      for (const row of rows) sheet.addRow(headers.map(header => row[header] ?? ''));
+      sheet.getRow(1).font = { bold: true };
+      sheet.columns.forEach(column => { column.width = 22; });
+    };
+
+    const summarySheet = wb.addWorksheet('Summary');
+    addObjectRows(summarySheet, ['Metric', 'Value'], [
       { Metric: 'Total WO', Value: summary.totals.total },
       { Metric: 'Completed', Value: summary.totals.completed },
       { Metric: 'FB-Issue', Value: summary.totals.fbIssue },
@@ -79,34 +85,30 @@ export class ReportsPhase3Service {
       { Metric: 'Installation', Value: summary.byType.installation },
       { Metric: 'Transfer', Value: summary.byType.transfer },
     ]);
-    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
 
-    // Sheet 2: Work Orders
-    const woSheet = XLSX.utils.json_to_sheet(wos.map((w:any)=>({
+    const woSheet = wb.addWorksheet('WorkOrders');
+    addObjectRows(woSheet, ['WO Number', 'Type', 'Status', 'Created', 'Remarks'], wos.map((w:any)=>({
       'WO Number': w.woNumber,
       'Type': w.type,
       'Status': w.status,
       'Created': w.createdAt,
-      'Remarks': w.remarks
+      'Remarks': w.remarks ?? ''
     })));
-    XLSX.utils.book_append_sheet(wb, woSheet, 'WorkOrders');
 
-    // Sheet 3: Audit Trail
-    const auditSheet = XLSX.utils.json_to_sheet(audit.map((a:any)=>({
+    const auditSheet = wb.addWorksheet('AuditTrail');
+    addObjectRows(auditSheet, ['Timestamp', 'Action', 'WO ID', 'Actor', 'Details'], audit.map((a:any)=>({
       'Timestamp': a.createdAt,
       'Action': a.action,
-      'WO ID': a.workOrderId,
-      'Actor': a.actorId,
+      'WO ID': a.workOrderId ?? '',
+      'Actor': a.actorId ?? '',
       'Details': JSON.stringify(a.details)
     })));
-    XLSX.utils.book_append_sheet(wb, auditSheet, 'AuditTrail');
 
-    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const output = await wb.xlsx.writeBuffer();
+    return Buffer.from(output);
   }
 
   async exportPdfData(range: string, from?: string, to?: string) {
-    // For Phase 3: return data for PDF generation (frontend will use jsPDF or backend uses PDFKit)
-    // Here we return structured data that frontend can print
     const summary = await this.getSummary(range as any, from, to);
     return {
       ...summary,
