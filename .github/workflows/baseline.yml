@@ -3,6 +3,7 @@ name: WFM Baseline Validation
 on:
   push:
     branches:
+      - main
       - wfm-phase-a1-baseline
       - wfm-phase-2-auth-rbac
       - wfm-phase-2-dependency-hardening
