@@ -14,6 +14,7 @@
     "test:assignment-race": "ts-node src/work-orders/assignment-race-selftest.ts",
     "test:import-concurrency": "ts-node src/work-orders/import-concurrency-selftest.ts",
     "test:operational-e2e": "ts-node src/work-orders/operational-e2e-selftest.ts",
+    "test:database-e2e": "ts-node src/work-orders/database-e2e-selftest.ts",
     "test:phase4": "ts-node src/phase4/phase4-selftest.ts",
     "test:security": "npm run test:auth && npm run test:rbac && npm run test:evidence-lifecycle && npm run test:finish-gate && npm run test:finish-race && npm run test:start-race && npm run test:assignment-race && npm run test:import-concurrency && npm run test:operational-e2e && npm run test:phase4",
     "prisma:generate": "prisma generate",
