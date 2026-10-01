@@ -53,7 +53,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
 
   web:
-    name: Web build
+    name: Web build and auth contract
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,6 +65,7 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: npm install --no-fund
+      - run: npm run test:auth-contract
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
