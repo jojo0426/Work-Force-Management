@@ -18,19 +18,20 @@ export class LiveOperationsService {
       }),
       this.prisma.jobExecution.findMany({
         where: { completedAt: null },
-        include: { workOrder: { select: { id: true, woNumber: true, type: true, status: true, subscriberId: true } }, technician: { select: { id: true, name: true, teamId: true, status: true, lastLat: true, lastLng: true, lastLocationAt: true } } },
+        include: { workOrder: { select: { id: true, woNumber: true, type: true, status: true, subscriberId: true } } },
         orderBy: { startedAt: 'asc' },
         take: 200,
       }),
       this.prisma.fieldException.findMany({
         where: { status: 'PENDING' },
-        include: { workOrder: { select: { id: true, woNumber: true, type: true, status: true } }, technician: { select: { id: true, name: true, teamId: true, status: true } } },
+        include: { workOrder: { select: { id: true, woNumber: true, type: true, status: true } } },
         orderBy: { reportedAt: 'asc' },
         take: 200,
       }),
     ]);
 
     const workOrders = Object.fromEntries(statusGroups.map((g) => [g.status, g._count]));
+    const technicianById = new Map(technicians.map((t) => [t.id, t]));
     const activeByTechnician = new Map(activeExecutions.map((e) => [e.technicianId, e]));
     const technicianRows = technicians.map((t) => {
       const active = activeByTechnician.get(t.id);
@@ -68,7 +69,7 @@ export class LiveOperationsService {
       activeExecutions: activeExecutions.map((e) => ({
         executionId: e.id,
         startedAt: e.startedAt,
-        technician: e.technician,
+        technician: technicianById.get(e.technicianId) || { id: e.technicianId, name: 'Unknown technician', teamId: null, status: null, lastLat: null, lastLng: null, lastLocationAt: null },
         workOrder: e.workOrder,
       })),
       pendingExceptions: pendingExceptions.map((x) => ({
@@ -78,7 +79,7 @@ export class LiveOperationsService {
         reportedAt: x.reportedAt,
         lat: x.lat,
         lng: x.lng,
-        technician: x.technician,
+        technician: technicianById.get(x.technicianId) || { id: x.technicianId, name: 'Unknown technician', teamId: null, status: null },
         workOrder: x.workOrder,
       })),
     };
