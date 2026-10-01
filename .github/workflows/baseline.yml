@@ -16,6 +16,20 @@ jobs:
   backend:
     name: Backend build and security validation
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: wfm_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d wfm_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -30,6 +44,10 @@ jobs:
       - run: npm install --no-fund
       - run: npm run prisma:generate
       - run: npx prisma validate
+      - name: Apply production migrations to clean PostgreSQL
+        run: npm run prisma:migrate:deploy
+      - name: Run database-backed operational E2E
+        run: npm run test:database-e2e
       - run: npm run test:security
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
