@@ -26,7 +26,8 @@ export class WorkOrdersService {
     if(!team)throw new NotFoundException('Team not found');if(!team.users.length)throw new BadRequestException('Selected team has no active technicians');
     return this.prisma.$transaction(async tx=>{
       const wo=await tx.workOrder.findUnique({where:{id:workOrderId}});if(!wo)throw new NotFoundException('Work order not found');
-      if(![WoStatus.DRAFT,WoStatus.ASSIGNED].includes(wo.status))throw new BadRequestException(`Cannot assign a ${wo.status.toLowerCase()} work order`);
+      const assignableStatuses:WoStatus[]=[WoStatus.DRAFT,WoStatus.ASSIGNED];
+      if(!assignableStatuses.includes(wo.status))throw new BadRequestException(`Cannot assign a ${wo.status.toLowerCase()} work order`);
       if(await tx.jobExecution.findFirst({where:{workOrderId,completedAt:null}}))throw new BadRequestException('Cannot change assignment while a work execution is active');
       const current=await tx.assignment.findMany({where:{workOrderId},orderBy:{assignedAt:'asc'}}),currentTeamIds=current.map(a=>a.teamId);
       if(wo.status===WoStatus.ASSIGNED&&currentTeamIds.length===1&&currentTeamIds[0]===teamId)return{assignment:current[0],workOrder:wo,idempotent:true};
