@@ -39,28 +39,34 @@ requireMatch('E2E assignment audit trail', service, /WORK_ORDER_REASSIGNED':'WOR
 
 // Technician visibility/start: technician sees only team jobs and atomically claims start.
 requireMatch('E2E technician list team scoped', controller, /where\.assignments=\{some:\{teamId:t\.teamId\}\}/);
-requireMatch('E2E technician list active states only', controller, /WoStatus\.ASSIGNED,WoStatus\.WORKING/);
+requireMatch('E2E technician list active states only', controller, /WoStatus\.ASSIGNED,WoStatus\.WORKING,WoStatus\.ON_HOLD/);
 requireMatch('E2E start technician-only', controller, /@Post\(':id\/start'\) @Roles\(UserRole\.TECHNICIAN\)/);
 requireMatch('E2E start validates team ownership', controller, /Work order is not assigned to your team/);
 requireMatch('E2E start atomic status claim', controller, /updateMany\(\{where:\{id,status:WoStatus\.ASSIGNED\}/);
 requireMatch('E2E start creates execution', controller, /jobExecution\.create/);
 requireMatch('E2E start audit trail', controller, /WORK_ORDER_STARTED/);
 
+// Field exception lifecycle: technician can pause work, operations reviews it, and finish is blocked while pending.
+requireMatch('E2E field exception technician endpoint', controller, /@Post\(':id\/exception'\) @Roles\(UserRole\.TECHNICIAN\)/);
+requireMatch('E2E field exception pending operations endpoint', controller, /@Get\('exceptions\/pending'\) @Roles\(UserRole\.JOB_CONTROLLER,UserRole\.SUPERVISOR,UserRole\.ADMINISTRATOR\)/);
+requireMatch('E2E field exception review operations endpoint', controller, /@Post\('exceptions\/:exceptionId\/review'\) @Roles\(UserRole\.JOB_CONTROLLER,UserRole\.SUPERVISOR,UserRole\.ADMINISTRATOR\)/);
+requireMatch('E2E finish blocks pending field exception', controller, /Pending field exception must be reviewed before finishing/);
+
 // Evidence: camera-only ticket -> upload -> registration contract.
 requireMatch('E2E evidence ticket endpoint', controller, /@Post\(':id\/evidence\/upload-ticket'\)/);
-requireMatch('E2E evidence ticket camera-only', controller, /restricted to in-app camera captures/);
+requireMatch('E2E evidence ticket camera-only', controller, /body\.captureSource!==['"]CAMERA['"]/);
 requireMatch('E2E evidence ticket validates execution ownership', controller, /No active execution belongs to this technician/);
 requireMatch('E2E evidence registration endpoint', controller, /@Post\(':id\/evidence'\)/);
-requireMatch('E2E evidence registration camera-only', controller, /Evidence must be captured using the in-app camera/);
-requireMatch('E2E evidence requires upload ticket', controller, /Upload ticket, evidence type, and capture timestamp are required/);
-requireMatch('E2E evidence captured after execution start', controller, /Evidence must be captured after the work execution started/);
+requireMatch('E2E evidence registration camera-only', controller, /body\.captureSource!==['"]CAMERA['"]/);
+requireMatch('E2E evidence requires upload ticket', controller, /Valid upload ticket, evidence type, and capture timestamp are required/);
+requireMatch('E2E evidence captured after execution start', controller, /capturedAt<execution\.startedAt/);
 
 // Finish: findings + measurements + verified evidence -> atomic final state + audit.
 requireMatch('E2E finish technician-only', controller, /@Post\(':id\/finish'\) @Roles\(UserRole\.TECHNICIAN\)/);
-requireMatch('E2E finish only approved final states', controller, /COMPLETED, FB_ISSUE, or CUST_ISSUE/);
-requireMatch('E2E finish requires findings', controller, /Findings are required before finishing a work order/);
+requireMatch('E2E finish only approved final states', controller, /FINAL_WO_STATUSES\.includes\(finalStatus\)/);
+requireMatch('E2E finish requires findings', controller, /Findings are required/);
 requireMatch('E2E finish invokes server gate', controller, /validateFinishGate/);
-requireMatch('E2E finish enforces speed measurements', controller, /Download, upload, and ping measurements are required for speed-related results/);
+requireMatch('E2E finish enforces speed measurements', controller, /Speed measurements required/);
 requireMatch('E2E finish transaction revalidates active execution', controller, /Work execution is no longer active/);
 requireMatch('E2E finish atomic WO claim', controller, /updateMany\(\{where:\{id,status:WoStatus\.WORKING\}/);
 requireMatch('E2E finish returns technician available', controller, /data:\{status:'AVAILABLE'\}/);
@@ -72,6 +78,7 @@ requireOrder('E2E lifecycle endpoints remain ordered', controller, [
   /@Post\('import-preview'\)/,
   /@Post\('confirm'\)/,
   /@Post\(':id\/start'\)/,
+  /@Post\(':id\/exception'\)/,
   /@Post\(':id\/evidence\/upload-ticket'\)/,
   /@Post\(':id\/evidence'\)/,
   /@Post\(':id\/finish'\)/,
