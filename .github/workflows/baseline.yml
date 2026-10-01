@@ -14,6 +14,8 @@ on:
       - main
   workflow_dispatch:
 
+# Phase 4 validation covers the authoritative live-operations snapshot and existing regression gates.
+
 jobs:
   backend:
     name: Backend build and security validation
@@ -87,6 +89,4 @@ jobs:
           package-manager-cache: false
       - run: npm install --no-fund
       - run: npx tsc --noEmit
-      # Expo SDK 50 currently brings vulnerable build/CLI transitive dependencies.
-      # Keep the report visible without pretending a forced major Expo upgrade is safe.
       - run: npm audit --omit=dev --audit-level=high || true
