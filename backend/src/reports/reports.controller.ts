@@ -1,7 +1,13 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Query, Param, Res, UseGuards } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { ReportsPhase3Service } from './reports-phase3.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('reports')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR)
 export class ReportsController {
   constructor(private reports: ReportsPhase3Service) {}
 
@@ -11,7 +17,7 @@ export class ReportsController {
   }
 
   @Get('export')
-  async export(@Query('format') format: string, @Query('range') range: string, @Query('from') from?: string, @Query('to') to?: string, @Res() res: any) {
+  async export(@Res() res: any, @Query('format') format: string, @Query('range') range: string, @Query('from') from?: string, @Query('to') to?: string) {
     if (format === 'excel' || format === 'xlsx') {
       const buf = await this.reports.exportExcel(range || 'monthly', from, to);
       res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="fiberblaze-report-'+range+'.xlsx"' });
@@ -21,13 +27,11 @@ export class ReportsController {
       const data = await this.reports.exportPdfData(range || 'monthly', from, to);
       return res.json({ message: 'PDF data ready — frontend generates PDF with jsPDF or print', data });
     }
-    return res.json({ error: 'Use format=excel or format=pdf' });
+    return res.status(400).json({ error: 'Use format=excel or format=pdf' });
   }
 
   @Get('audit/:workOrderId')
-  async auditTrail(@Query('workOrderId') workOrderId: string) {
-    // 09:03 assigned, 09:27 started, 09:29 GPS, 09:42 photo, 09:51 measurement, 10:05 completed
-    // Important activities should have history + who changed verified info, when, why
-    return { workOrderId, message: 'Use /audit/:id endpoint from field controller for now' };
+  async auditTrail(@Param('workOrderId') workOrderId: string) {
+    return { workOrderId, message: 'Use /audit/:id endpoint for the full work-order timeline' };
   }
 }
