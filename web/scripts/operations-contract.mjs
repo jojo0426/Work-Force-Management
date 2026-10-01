@@ -33,6 +33,10 @@ expect('reports expose corrected backlog KPI', reports.includes('label="Backlog"
 expect('reports expose completion rate and average completion', reports.includes('label="CompletionRate"') && reports.includes('label="AvgCompletion"'));
 expect('reports expose on hold and issue KPIs', reports.includes('label="OnHold"') && reports.includes('label="FB-Issue"') && reports.includes('label="CUST-Issue"'));
 expect('reports retain Excel and print output', reports.includes('ExportExcel') && reports.includes('window.print()'));
-expect('reports expose technician execution performance without auto ranking', reports.includes('TechnicianExecutionPerformance') && reports.includes('notanautomaticpersonnelranking'));
+expect('reports expose team operational performance', reports.includes('TeamOperationalPerformance') && reports.includes('teamPerformance:TeamPerf[]'));
+expect('team view exposes workload and capacity metrics', reports.includes('WOLoad') && reports.includes('availableTechnicians') && reports.includes('workingTechnicians') && reports.includes('AvgCompletion'));
+expect('team view documents latest-assignment semantics', reports.includes('latestassignmentonly') && reports.includes('reassignmenthistoryisnotdouble-counted'));
+expect('team and technician views avoid automatic personnel ranking', reports.includes('doesnotscoreorautomaticallyrankemployees') && reports.includes('notanautomaticpersonnelranking'));
+expect('reports expose technician execution performance without auto ranking', reports.includes('TechnicianExecutionPerformance'));
 
 console.log('Live Operations and Supervisor KPI web contract gate passed.');
