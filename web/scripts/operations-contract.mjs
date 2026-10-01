@@ -8,12 +8,14 @@ function expect(label, condition) {
 
 const nav = readFileSync(resolve(process.cwd(), 'app/ManagementQuickNav.tsx'), 'utf8').replace(/\s+/g, '');
 const board = readFileSync(resolve(process.cwd(), 'app/operations/page.tsx'), 'utf8').replace(/\s+/g, '');
+const reports = readFileSync(resolve(process.cwd(), 'app/reports/page.tsx'), 'utf8').replace(/\s+/g, '');
 const layout = readFileSync(resolve(process.cwd(), 'app/layout.tsx'), 'utf8').replace(/\s+/g, '');
 
 expect('management layout mounts quick navigation', layout.includes('<ManagementQuickNav/>'));
 expect('navigation is hidden without an authorized session', nav.includes("if(!authorized)returnnull"));
 expect('navigation restricts management roles', nav.includes("['JOB_CONTROLLER','SUPERVISOR','ADMINISTRATOR'].includes(session.user.role)"));
 expect('navigation exposes Live Operations route', nav.includes('href="/operations"') && nav.includes('LiveOperations'));
+expect('navigation exposes Supervisor KPI route', nav.includes('href="/reports"') && nav.includes('SupervisorKPIs'));
 expect('board uses authenticated API client', board.includes("apiJson<Snapshot>('/phase4/operations/live',{},active)"));
 expect('board keeps 15 second operational refresh', board.includes('setInterval(()=>refresh(session),15000)'));
 expect('board returns to management portal', board.includes('href="/"') && board.includes('ManagementPortal'));
@@ -25,5 +27,12 @@ expect('attention details can jump to related operational section', board.includ
 expect('pending exceptions link to management review surface', board.includes('OpenManagementPortaltoreview'));
 expect('location state distinguishes missing GPS', board.includes('NOGPSREPORTED'));
 expect('filters are stateful across snapshot refresh', board.includes('Filtersstayselectedduringautomaticrefresh'));
+expect('reports use authenticated summary endpoint', reports.includes('apiJson<Summary>(`/reports/summary?range=${range}`,{},session)'));
+expect('reports expose daily weekly monthly periods', reports.includes("['daily','weekly','monthly']"));
+expect('reports expose corrected backlog KPI', reports.includes('label="Backlog"') && reports.includes('data.totals.pending'));
+expect('reports expose completion rate and average completion', reports.includes('label="CompletionRate"') && reports.includes('label="AvgCompletion"'));
+expect('reports expose on hold and issue KPIs', reports.includes('label="OnHold"') && reports.includes('label="FB-Issue"') && reports.includes('label="CUST-Issue"'));
+expect('reports retain Excel and print output', reports.includes('ExportExcel') && reports.includes('window.print()'));
+expect('reports expose technician execution performance without auto ranking', reports.includes('TechnicianExecutionPerformance') && reports.includes('notanautomaticpersonnelranking'));
 
-console.log('Live Operations web contract gate passed.');
+console.log('Live Operations and Supervisor KPI web contract gate passed.');
