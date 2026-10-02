@@ -1,12 +1,13 @@
-# FiberBlaze WFM — Phase 4 FINAL — Complete Production System — Reporting + Audit + Photo Optimization + Integration Layer + GPS DB (Runnable)
+# FiberBlaze WFM — Phase 3 Dispatch and Technician Lifecycle
 
-**Status:** MVP 6-week build — RUNNABLE with npm install
+**Status:** Phase 3 work-order dispatch and technician lifecycle completed and merged on October 1, 2026 ([PR #1](https://github.com/jojo0426/Work-Force-Management/pull/1)). This is a validated implementation checkpoint before the next WFM phase, not a declaration that the entire production system is final.
 **Repo:** jojo0426/Work-Force-Management
 
-## What's Real in This Build (not skeleton)
-- **Backend:** NestJS + Prisma + PostGIS + XLSX parser + S3 presigned upload + JWT auth + Socket.IO GPS + Audit
-- **Mobile:** Expo SDK 50 + expo-camera (camera-only enforcement), expo-location (foreground + background tracking), SQLite offline queue, MMKV
-- **Web:** Next.js 14 + Mapbox GL + Tailwind + Excel drag-drop + Validate → Preview → Assign → Dispatch flow + Nearby Tech
+## Current Capabilities
+- **Backend:** NestJS + Prisma, PostgreSQL/PostGIS setup, ExcelJS-based Excel import, JWT authentication and role checks, work-order lifecycle enforcement, evidence handling, GPS and audit modules.
+- **Mobile:** Expo SDK 50 technician app with camera evidence, location support, local cache/offline queue, and server-authoritative work-order synchronization.
+- **Web:** Next.js 16 + Mapbox GL + Tailwind, authentication contract, and work-order import/assignment/dispatch workflows.
+- **Lifecycle reliability:** guarded Start, Field Issue, Evidence, and Finish mutations; reconciliation after management removal or status changes; stale local workflow invalidation; synchronization and management-race regression coverage.
 
 ## Architecture
 WEB PORTAL (Job Controller/Supervisor) + TECHNICIAN APP → CENTRAL WFM API → DATABASE/PHOTO/GPS/AUDIT/REPORTS → INTEGRATION LAYER
@@ -54,50 +55,91 @@ npx expo start
 
 ## Key Flows Implemented
 
-### Dispatch (Excel → Technician)
-1. Job Controller drags Excel file in web portal
-2. Backend parses with XLSX: columns WO Number, Type, Subscriber, Address, NAP, Port, Remarks
-3. Validate: NAP exists?, duplicate WO?, GPS missing?
-4. Preview table shows 20 rows + errors
-5. Assign Team → status ASSIGNED, audit 09:03 assigned, push notification (Socket.IO)
-6. Technician sees in My Jobs
+### Dispatch and Technician Lifecycle
+- Import, validate, and assign work orders through the management workflow.
+- Technicians synchronize assigned work orders from the server and execute Start, evidence submission, field-exception, and Finish actions.
+- Backend authorization and lifecycle guards enforce valid mutations against the current work-order state.
+- Management removal or status changes reconcile into the technician client and invalidate stale local workflows.
 
-### Field Execution
-- ASSIGNED → Start Job → WORKING (audit 09:27 started, 09:29 GPS recorded)
-- Enter measurements: RX -19.4 dBm, Download 287 Mbps, Upload 294, Ping 4, NAP DIC01-10-N04 Port 7
-- UPLOAD PHOTO: Camera-only — OPEN CAMERA → CAPTURE → PREVIEW → RETAKE/USE PHOTO — EXIF check, no gallery
-- Evidence matrix per WO type (repair/install/transfer/FB-ISSUE/CUST-ISSUE)
-- COMPLETED / FB-ISSUE / CUST-ISSUE → Smart Next suggestion: WO-1001 450m
+### Evidence and Field Exceptions
+- Technician camera evidence and evidence lifecycle checks support work-order execution.
+- Finish gates validate required evidence and lifecycle conditions.
+- Field-exception lifecycle behavior has database-backed E2E and regression coverage.
 
-### GPS & Nearby
-- Mobile sends location every 15s when logged in + permission granted
-- Web map shows: Online 🟢, Working 🟡, Available 🔵, Offline ⚫, Stale (last known + timestamp)
-- Nearby Tech: Find technicians within radius, Team A 650m, B 1.4km, C 3.2km — suggestion only, no auto-reassign
-- If stale >5min, is_stale=true, don't pretend exact location
+### Synchronization and Concurrency
+- Server state is authoritative for technician work-order synchronization.
+- Local cache and offline queue support field work; stale actions are checked against current server state.
+- Regression gates cover Finish, Start, assignment, import concurrency, client/server contracts, mobile synchronization, and stale actions.
+- Formatting-independent synchronization and management-race checks protect against stale client state and concurrent management changes.
 
-### Mismatch Protection
-- Tech reports NAP mismatch: DB DIC01-10-N04 vs found DIC01-10-N05
-- Creates mismatch PENDING, Supervisor reviews → Approve/Reject, never overwrites verified directly
+## Validation and CI
+The merged Phase 3 checkpoint records **WFM Baseline Validation #160: PASS**, including:
+- Database-backed operational E2E.
+- Database-backed field-exception lifecycle E2E.
+- Security validation, including authentication/RBAC, evidence/Finish gates, synchronization contracts, and race regressions.
+- Backend build.
+- Web authentication contract and production build.
+- Mobile TypeScript validation.
+- Production dependency audit gates for backend and web.
 
-### Offline
-- Mobile SQLite: assigned WOs, findings, measurements, photos, status updates
-- Queue + sync on reconnect — technician never loses field report
+[WFM Baseline Validation](.github/workflows/baseline.yml) runs on pull requests targeting `main`, pushes to `main` and the listed phase branches, and manual dispatch. [Commit 47eeca27b0ac4ca01dea565b77ffc0a811d94cee](https://github.com/jojo0426/Work-Force-Management/commit/47eeca27b0ac4ca01dea565b77ffc0a811d94cee) added push validation for `main`.
+
+CI uses Node.js 24 and a clean PostgreSQL 16 database, validates the Prisma schema, and applies production migrations before database E2E checks. Backend and web production audits fail on high-severity findings. The mobile audit remains visible but non-blocking because Expo SDK 50 brings known build/CLI transitive dependency vulnerabilities; a passing workflow does not mean the mobile dependency audit is clean.
+
+Passing these checks establishes the documented Phase 3 checkpoint. Mobile TypeScript validation is not a device/runtime test, and CI does not by itself establish live production deployment readiness.
+
+### Reproduce the CI Checks
+Use a disposable PostgreSQL database for database-backed E2E checks and configure `DATABASE_URL` before running them.
+
+```bash
+cd backend
+npm install --no-fund
+npm run prisma:generate
+npx prisma validate
+npm run prisma:migrate:deploy
+npm run test:database-e2e
+npm run test:field-exception-database-e2e
+npm run test:security
+npm run build
+npm audit --omit=dev --audit-level=high
+```
+
+```bash
+cd web
+npm install --no-fund
+npm run test:auth-contract
+npm run build
+npm audit --omit=dev --audit-level=high
+```
+
+```bash
+cd mobile
+npm install --no-fund
+npx tsc --noEmit
+npm audit --omit=dev --audit-level=high
+# CI reports the mobile audit without making it a blocking gate.
+```
 
 ## Env Vars
 See .env.example in each package.
 
-## Phase 1 Complete Checklist
-- [x] Auth + Roles
-- [x] Excel upload/validate/preview
-- [x] Assign/Dispatch
-- [x] Technician: My Jobs, Job Detail, Start, Measurements, Camera-only photos, Complete/Issue
-- [x] GPS tracking + stale logic + Nearby
-- [x] Offline cache + sync
-- [x] Audit trail + Basic reports (Excel/PDF)
-- [x] Transfer Old/New split
+## Phase 3 Completed Checkpoint
+- [x] Work-order dispatch and technician lifecycle slice merged in PR #1.
+- [x] Server-authoritative technician synchronization.
+- [x] Management removal/status-change reconciliation and stale workflow invalidation.
+- [x] Guarded Start / Field Issue / Evidence / Finish mutations.
+- [x] Operational and field-exception database E2E validation.
+- [x] Security, synchronization, and concurrency/race regression gates.
+- [x] Backend build, web auth/build, and mobile TypeScript validation.
+- [x] Backend/web production dependency audit gates.
+- [x] Baseline validation on pushes to main.
+- [ ] Resolve mobile dependency audit findings through a planned Expo upgrade and runtime validation.
+- [ ] Complete the next implementation phase and deployment/device acceptance checks before declaring the full system production-ready.
 
-## Next (Phase 2)
-Nearby Tech UI improvements, Smart Next algorithm, GPS DB verification, Mismatch queue, Transfer flow polish.
+## Next Phase Roadmap
+Phase 3 is the completed baseline for the next WFM implementation phase. Define and review that phase's scope and acceptance criteria, preserve the existing regression gates, and add validation for each new capability.
+
+Remaining readiness work includes mobile dependency modernization, device testing of camera/location/offline recovery, and environment-specific deployment and operational acceptance. GPS/Nearby, reporting, audit, and integration capabilities should be assessed against explicit acceptance criteria before being described as fully production-ready. The repository does not establish a completed “Phase 4 FINAL” release or a new six-week delivery commitment.
 
 ---
 Built for FiberBlaze — Dasmariñas, PH
