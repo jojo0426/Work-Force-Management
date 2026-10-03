@@ -14,17 +14,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ManagementQuickNav />
           <div className="fb-content">
             <header className="fb-topbar">
-              <div className="fb-topbar-left">
-                <div className="fb-topbar-logo-wrap">
-                  <img className="fb-topbar-logo" src="/images/fiberblaze-logo.png" alt="FiberBlaze" />
+              <div>
+                <div className="fb-mobile-bar">
+                  <span className="fb-mobile-brand">FIBERBLAZE</span>
+                  <span style={{color:'#3f4652'}}>•</span>
+                  <span className="fb-topbar-title">WFM</span>
                 </div>
-                <div>
-                  <div className="fb-mobile-bar">
-                    <span className="fb-topbar-title">WFM</span>
-                  </div>
-                  <div className="fb-topbar-title" style={{display:'var(--desktop-title, block)'}}>Workforce Management</div>
-                  <div className="fb-topbar-meta">Field operations command center</div>
-                </div>
+                <div className="fb-topbar-title" style={{display:'var(--desktop-title, block)'}}>Workforce Management</div>
+                <div className="fb-topbar-meta">Field operations command center</div>
               </div>
               <div className="fb-user">
                 <div style={{textAlign:'right'}}>
