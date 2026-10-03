@@ -4,207 +4,23 @@ import { useEffect, useRef, useState } from 'react';
 import { apiJson, loadSession, Session } from '../../lib/api';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-type Feed = {
-  generatedAt: string;
-  technicians: any[];
-  subscribers: any[];
-  naps: any[];
-  workOrders: any[];
-};
+type Feed={generatedAt:string;technicians:any[];subscribers:any[];naps:any[];workOrders:any[]};
+type Suggestion={sequence:number;id:string;woNumber:string;type:string;priority:number;distance_m:number;distance_km:number;subscriber:{accountNumber:string;name:string;address:string;lat:number;lng:number;napId?:string|null}};
+type Smart={suggestions?:Suggestion[];recommended?:Suggestion|null;candidatesConsidered?:number;excludedWithoutVerifiedLocation?:number;message?:string};
+const EMPTY:Feed={generatedAt:'',technicians:[],subscribers:[],naps:[],workOrders:[]};
+const OSM_RASTER_STYLE:any={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors',maxzoom:19}},layers:[{id:'osm',type:'raster',source:'osm'}]};
 
-const EMPTY: Feed = {
-  generatedAt: '',
-  technicians: [],
-  subscribers: [],
-  naps: [],
-  workOrders: [],
-};
-
-const OSM_RASTER_STYLE: any = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
-      maxzoom: 19,
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-};
-
-export default function Operations() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [feed, setFeed] = useState<Feed>(EMPTY);
-  const [error, setError] = useState('');
-  const [layer, setLayer] = useState({ tech: true, subs: true, naps: true, jobs: true });
-  const [selected, setSelected] = useState<any>(null);
-  const [mapReady, setMapReady] = useState(false);
-  const mapEl = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markers = useRef<any[]>([]);
-
-  useEffect(() => setSession(loadSession()), []);
-
-  useEffect(() => {
-    if (!session) return;
-    let live = true;
-    const load = () =>
-      apiJson<Feed>('/gps/operations-map', {}, session)
-        .then((x) => {
-          if (live) {
-            setFeed(x);
-            setError('');
-          }
-        })
-        .catch((e) => live && setError(e.message));
-    load();
-    const id = setInterval(load, 15000);
-    return () => {
-      live = false;
-      clearInterval(id);
-    };
-  }, [session]);
-
-  useEffect(() => {
-    if (!session || !mapEl.current || mapRef.current) return;
-    let cancelled = false;
-    import('maplibre-gl').then((mod) => {
-      if (cancelled || !mapEl.current) return;
-      const maplibregl: any = (mod as any).default || mod;
-      const map = new maplibregl.Map({
-        container: mapEl.current,
-        style: OSM_RASTER_STYLE,
-        center: [120.94, 14.41],
-        zoom: 11,
-      });
-      map.addControl(new maplibregl.NavigationControl(), 'top-right');
-      map.on('load', () => setMapReady(true));
-      mapRef.current = { map, maplibregl };
-    });
-    return () => {
-      cancelled = true;
-      mapRef.current?.map?.remove();
-      mapRef.current = null;
-    };
-  }, [session]);
-
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    markers.current.forEach((m) => m.remove());
-    markers.current = [];
-    const { map, maplibregl } = mapRef.current;
-    const add = (x: any, kind: string, title: string, detail: string) => {
-      if (x.lng == null || x.lat == null) return;
-      const el = document.createElement('button');
-      el.className = `wfm-map-marker ${kind}`;
-      el.title = title;
-      el.onclick = () => setSelected({ ...x, kind, title, detail });
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([Number(x.lng), Number(x.lat)])
-        .addTo(map);
-      markers.current.push(marker);
-    };
-    if (layer.tech)
-      feed.technicians
-        .filter((t) => t.status !== 'OFFLINE')
-        .forEach((t) => add(t, t.isFresh ? 'technician' : 'technician stale', t.name, `${t.teamName || 'No team'} • ${t.status}`));
-    if (layer.subs) feed.subscribers.forEach((s) => add(s, 'subscriber', s.name, s.address));
-    if (layer.naps) feed.naps.forEach((n) => add(n, 'nap', n.napCode, n.address || 'NAP'));
-    if (layer.jobs)
-      feed.workOrders
-        .filter((w) => w.lat != null && w.lng != null)
-        .forEach((w) => add(w, 'job', w.woNumber, `${w.type} • ${w.status}`));
-  }, [feed, layer, mapReady]);
-
-  if (!session)
-    return (
-      <div className="wfm-page">
-        <div className="wfm-panel">
-          <h2>Live GPS Operations</h2>
-          <p>Sign in through Command Center first.</p>
-        </div>
-      </div>
-    );
-
-  const online = feed.technicians.filter((t) => t.status !== 'OFFLINE');
-  const fresh = online.filter((t) => t.isFresh);
-
-  return (
-    <div className="wfm-page">
-      <div className="wfm-page-head">
-        <div>
-          <span className="wfm-eyebrow">LIVE FIELD VISIBILITY</span>
-          <h1>Live GPS Operations</h1>
-          <p>Technicians, subscribers, NAP facilities and active service orders in one operational view.</p>
-        </div>
-        <div className="wfm-live"><i /> REFRESH 15 SEC</div>
-      </div>
-      {error && <div className="wfm-alert">{error}</div>}
-      <div className="wfm-kpis">
-        <K label="Online Technicians" v={online.length} />
-        <K label="Fresh GPS" v={fresh.length} />
-        <K label="Subscribers Mapped" v={feed.subscribers.length} />
-        <K label="NAPs Mapped" v={feed.naps.length} />
-        <K label="Active Work Orders" v={feed.workOrders.length} />
-      </div>
-      <div className="wfm-map-layout">
-        <div className="wfm-panel wfm-map-panel">
-          <div className="wfm-map-toolbar">
-            <b>Operations Map</b>
-            <Toggle label="Teams" on={layer.tech} set={() => setLayer((x) => ({ ...x, tech: !x.tech }))} />
-            <Toggle label="Subscribers" on={layer.subs} set={() => setLayer((x) => ({ ...x, subs: !x.subs }))} />
-            <Toggle label="NAP" on={layer.naps} set={() => setLayer((x) => ({ ...x, naps: !x.naps }))} />
-            <Toggle label="Work Orders" on={layer.jobs} set={() => setLayer((x) => ({ ...x, jobs: !x.jobs }))} />
-          </div>
-          <div ref={mapEl} className="wfm-map" />
-          <div className="wfm-map-legend">
-            <span><i className="technician" /> Technician</span>
-            <span><i className="subscriber" /> Subscriber</span>
-            <span><i className="nap" /> NAP</span>
-            <span><i className="job" /> Active WO</span>
-          </div>
-        </div>
-        <div>
-          <div className="wfm-panel">
-            <h3>Online Field Teams</h3>
-            {online.length ? online.map((t) => (
-              <button
-                className="wfm-live-tech"
-                key={t.id}
-                onClick={() => {
-                  setSelected({ ...t, kind: 'technician', title: t.name, detail: `${t.teamName || 'No team'} • ${t.status}` });
-                  if (t.lng != null && t.lat != null) mapRef.current?.map?.flyTo({ center: [t.lng, t.lat], zoom: 15 });
-                }}
-              >
-                <span className={`wfm-tech-dot ${t.isStale ? 'stale' : ''}`} />
-                <span>
-                  <b>{t.name}</b>
-                  <small>{t.teamName || 'No team'} • {t.status} • {t.locationAgeSeconds == null ? 'No GPS' : `${t.locationAgeSeconds}s ago`}</small>
-                </span>
-              </button>
-            )) : <div className="wfm-empty">No technicians currently online.</div>}
-          </div>
-          {selected && (
-            <div className="wfm-panel">
-              <span className="wfm-eyebrow">SELECTED {String(selected.kind).toUpperCase()}</span>
-              <h3>{selected.title}</h3>
-              <p>{selected.detail}</p>
-              {selected.woNumber && <a className="wfm-link" href="/dispatch">Open controlled dispatch →</a>}
-              <small className="wfm-coordinate">{selected.lat != null ? `${Number(selected.lat).toFixed(6)}, ${Number(selected.lng).toFixed(6)}` : 'Location unavailable'}</small>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function K({ label, v }: { label: string; v: number }) {
-  return <div className="wfm-kpi"><span>{label}</span><strong>{v}</strong></div>;
-}
-
-function Toggle({ label, on, set }: { label: string; on: boolean; set: () => void }) {
-  return <button className={`wfm-layer-toggle ${on ? 'on' : ''}`} onClick={set}>{label}</button>;
-}
+export default function Operations(){
+ const[session,setSession]=useState<Session|null>(null),[feed,setFeed]=useState<Feed>(EMPTY),[error,setError]=useState(''),[layer,setLayer]=useState({tech:true,subs:true,naps:true,jobs:true}),[selected,setSelected]=useState<any>(null),[mapReady,setMapReady]=useState(false),[smart,setSmart]=useState<Smart|null>(null),[smartBusy,setSmartBusy]=useState(false);
+ const mapEl=useRef<HTMLDivElement>(null),mapRef=useRef<any>(null),markers=useRef<any[]>([]),smartMarkers=useRef<any[]>([]),smartLine=useRef(false);
+ useEffect(()=>setSession(loadSession()),[]);
+ useEffect(()=>{if(!session)return;let live=true;const load=()=>apiJson<Feed>('/gps/operations-map',{},session).then(x=>{if(live){setFeed(x);setError('')}}).catch(e=>live&&setError(e.message));load();const id=setInterval(load,15000);return()=>{live=false;clearInterval(id)}},[session]);
+ useEffect(()=>{if(!session||!mapEl.current||mapRef.current)return;let cancelled=false;import('maplibre-gl').then(mod=>{if(cancelled||!mapEl.current)return;const maplibregl:any=(mod as any).default||mod;const map=new maplibregl.Map({container:mapEl.current,style:OSM_RASTER_STYLE,center:[120.94,14.41],zoom:11});map.addControl(new maplibregl.NavigationControl(),'top-right');map.on('load',()=>setMapReady(true));mapRef.current={map,maplibregl}});return()=>{cancelled=true;mapRef.current?.map?.remove();mapRef.current=null}},[session]);
+ useEffect(()=>{if(!mapReady||!mapRef.current)return;markers.current.forEach(m=>m.remove());markers.current=[];const{map,maplibregl}=mapRef.current;const add=(x:any,kind:string,title:string,detail:string)=>{if(x.lng==null||x.lat==null)return;const el=document.createElement('button');el.className=`wfm-map-marker ${kind}`;el.title=title;el.onclick=()=>{setSelected({...x,kind,title,detail});setSmart(null)};const marker=new maplibregl.Marker({element:el}).setLngLat([Number(x.lng),Number(x.lat)]).addTo(map);markers.current.push(marker)};if(layer.tech)feed.technicians.filter(t=>t.status!=='OFFLINE').forEach(t=>add(t,t.isFresh?'technician':'technician stale',t.name,`${t.teamName||'No team'} • ${t.status}`));if(layer.subs)feed.subscribers.forEach(s=>add(s,'subscriber',s.name,s.address));if(layer.naps)feed.naps.forEach(n=>add(n,'nap',n.napCode,n.address||'NAP'));if(layer.jobs)feed.workOrders.filter(w=>w.lat!=null&&w.lng!=null).forEach(w=>add(w,'job',w.woNumber,`${w.type} • ${w.status}`))},[feed,layer,mapReady]);
+ useEffect(()=>{if(!mapReady||!mapRef.current)return;const{map,maplibregl}=mapRef.current;smartMarkers.current.forEach(m=>m.remove());smartMarkers.current=[];if(smartLine.current){if(map.getLayer('smart-next-line'))map.removeLayer('smart-next-line');if(map.getSource('smart-next-line'))map.removeSource('smart-next-line');smartLine.current=false}const q=smart?.suggestions||[];if(!q.length)return;const coords:number[][]=[];if(selected?.lng!=null&&selected?.lat!=null)coords.push([Number(selected.lng),Number(selected.lat)]);q.forEach((x,i)=>{const c=[Number(x.subscriber.lng),Number(x.subscriber.lat)];coords.push(c);const el=document.createElement('button');el.className=`wfm-smart-map-stop ${i===0?'next':''}`;el.textContent=String(x.sequence||i+1);el.title=`${x.woNumber} • ${x.subscriber.name} • ${x.distance_km} km`;el.onclick=()=>setSelected({...selected,smartStop:x});smartMarkers.current.push(new maplibregl.Marker({element:el}).setLngLat(c).addTo(map))});if(coords.length>1){map.addSource('smart-next-line',{type:'geojson',data:{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:coords}}});map.addLayer({id:'smart-next-line',type:'line',source:'smart-next-line',paint:{'line-color':'#f36b21','line-width':4,'line-opacity':.8,'line-dasharray':[2,2]}});smartLine.current=true;const bounds=coords.reduce((b:any,c:any)=>b.extend(c),new maplibregl.LngLatBounds(coords[0],coords[0]));map.fitBounds(bounds,{padding:70,maxZoom:15})}},[smart,mapReady]);
+ async function loadSmart(t:any){setSelected({...t,kind:'technician',title:t.name,detail:`${t.teamName||'No team'} • ${t.status}`});setSmart(null);if(t.lng!=null&&t.lat!=null)mapRef.current?.map?.flyTo({center:[Number(t.lng),Number(t.lat)],zoom:15});if(t.lng==null||t.lat==null){setError('Selected technician has no usable GPS location for Smart Next.');return}setSmartBusy(true);setError('');try{setSmart(await apiJson(`/work-orders/smart-next?technicianId=${encodeURIComponent(t.id)}&lat=${t.lat}&lng=${t.lng}`,{},session))}catch(e:any){setError(e.message)}finally{setSmartBusy(false)}}
+ if(!session)return <div className="wfm-page"><div className="wfm-panel"><h2>Live GPS Operations</h2><p>Sign in through Command Center first.</p></div></div>;
+ const online=feed.technicians.filter(t=>t.status!=='OFFLINE'),fresh=online.filter(t=>t.isFresh),queue=smart?.suggestions||[],recommended=smart?.recommended;
+ return <div className="wfm-page"><div className="wfm-page-head"><div><span className="wfm-eyebrow">LIVE FIELD VISIBILITY + SMART DISPATCH</span><h1>Live GPS Operations</h1><p>Technicians, subscribers, NAP facilities, service orders and controlled geographic sequencing in one operational view.</p></div><div className="wfm-live"><i/> REFRESH 15 SEC</div></div>{error&&<div className="wfm-alert">{error}</div>}<div className="wfm-kpis"><K label="Online Technicians" v={online.length}/><K label="Fresh GPS" v={fresh.length}/><K label="Subscribers Mapped" v={feed.subscribers.length}/><K label="NAPs Mapped" v={feed.naps.length}/><K label="Active Work Orders" v={feed.workOrders.length}/></div><div className="wfm-map-layout"><div className="wfm-panel wfm-map-panel"><div className="wfm-map-toolbar"><b>Operations Map</b><Toggle label="Teams" on={layer.tech} set={()=>setLayer(x=>({...x,tech:!x.tech}))}/><Toggle label="Subscribers" on={layer.subs} set={()=>setLayer(x=>({...x,subs:!x.subs}))}/><Toggle label="NAP" on={layer.naps} set={()=>setLayer(x=>({...x,naps:!x.naps}))}/><Toggle label="Work Orders" on={layer.jobs} set={()=>setLayer(x=>({...x,jobs:!x.jobs}))}/></div><div ref={mapEl} className="wfm-map"/><div className="wfm-map-legend"><span><i className="technician"/> Technician</span><span><i className="subscriber"/> Subscriber</span><span><i className="nap"/> NAP</span><span><i className="job"/> Active WO</span>{queue.length>0&&<span><b className="wfm-smart-legend">1</b> Smart Next sequence</span>}</div></div><div><div className="wfm-panel"><h3>Online Field Teams</h3>{online.length?online.map(t=><button className={`wfm-live-tech ${selected?.id===t.id?'selected':''}`} key={t.id} onClick={()=>loadSmart(t)}><span className={`wfm-tech-dot ${t.isStale?'stale':''}`}/><span><b>{t.name}</b><small>{t.teamName||'No team'} • {t.status} • {t.locationAgeSeconds==null?'No GPS':`${t.locationAgeSeconds}s ago`}</small></span><span className="wfm-mini-action">{smartBusy&&selected?.id===t.id?'…':'SMART NEXT'}</span></button>):<div className="wfm-empty">No technicians currently online.</div>}</div>{selected&&<div className="wfm-panel"><span className="wfm-eyebrow">SELECTED {String(selected.kind).toUpperCase()}</span><h3>{selected.title}</h3><p>{selected.detail}</p>{selected.kind==='technician'&&<a className="wfm-link" href={`/dispatch${selected.id?`?technicianId=${encodeURIComponent(selected.id)}`:''}`}>Open controlled dispatch →</a>}{selected.woNumber&&<a className="wfm-link" href="/dispatch">Open controlled dispatch →</a>}<small className="wfm-coordinate">{selected.lat!=null?`${Number(selected.lat).toFixed(6)}, ${Number(selected.lng).toFixed(6)}`:'Location unavailable'}</small></div>}</div></div>{selected?.kind==='technician'&&<div className="wfm-grid-2"><div className="wfm-panel"><div className="wfm-section-title"><div><span className="wfm-eyebrow">#1 NEXT RECOMMENDED</span><h3>{recommended?recommended.woNumber:'Smart Next'}</h3></div>{recommended&&<span className="wfm-distance">{recommended.distance_km} km</span>}</div>{recommended?<div className="wfm-recommend-card"><h2>{recommended.subscriber.name}</h2><p>{recommended.subscriber.address}</p><div className="wfm-recommend-meta"><div><small>TYPE</small><b>{recommended.type}</b></div><div><small>NAP</small><b>{recommended.subscriber.napId||'Not linked'}</b></div><div><small>PRIORITY</small><b>{recommended.priority}</b></div><div><small>DISTANCE</small><b>{recommended.distance_m} m</b></div></div><a className="wfm-dispatch-map-link" href={`/dispatch?technicianId=${encodeURIComponent(selected.id)}`}>Review in controlled dispatch →</a></div>:<div className="wfm-empty">{smartBusy?'Calculating geographic sequence…':'No eligible mapped assigned work order found.'}</div>}<div className="wfm-info">Recommendation only. No assignment, work-order order, or job status is changed from this map.</div></div><div className="wfm-panel"><div className="wfm-section-title"><div><span className="wfm-eyebrow">MAP SEQUENCE</span><h3>Assigned Geographic Queue</h3></div><span className="wfm-control-pill">NO AUTO REORDER</span></div>{queue.length?queue.map((x,i)=><div className={`wfm-route-row ${i===0?'recommended':''}`} key={x.id}><span className="wfm-route-number">{x.sequence||i+1}</span><div><b>{x.woNumber} · {x.subscriber.name}</b><small>{x.type} • {x.subscriber.address}</small><small>{x.subscriber.napId?`NAP ${x.subscriber.napId} • `:''}{x.distance_km} km</small></div>{i===0&&<span className="wfm-badge smart">NEXT</span>}</div>):<div className="wfm-empty">No mapped queue available for this technician.</div>}{smart&&<div className="wfm-smart-summary"><span>{smart.candidatesConsidered||0} considered</span><span>{queue.length} mapped</span><span>{smart.excludedWithoutVerifiedLocation||0} without GPS</span></div>}</div></div>}</div>}
+function K({label,v}:{label:string;v:number}){return <div className="wfm-kpi"><span>{label}</span><strong>{v}</strong></div>}
+function Toggle({label,on,set}:{label:string;on:boolean;set:()=>void}){return <button className={`wfm-layer-toggle ${on?'on':''}`} onClick={set}>{label}</button>}
