@@ -16,17 +16,17 @@ expect('navigation is hidden without an authorized session', nav.includes("if(!a
 expect('navigation restricts management roles', nav.includes("['JOB_CONTROLLER','SUPERVISOR','ADMINISTRATOR'].includes(session.user.role)"));
 expect('navigation exposes Live GPS Operations route', nav.includes('href:\'/operations\'') && nav.includes("label:'LiveGPSOperations'"));
 expect('navigation exposes Reports & KPIs route', nav.includes('href:\'/reports\'') && nav.includes("label:'Reports&KPIs'"));
-expect('board uses authenticated API client', board.includes("apiJson<Snapshot>('/phase4/operations/live',{},active)"));
-expect('board keeps 15 second operational refresh', board.includes('setInterval(()=>refresh(session),15000)'));
-expect('board returns to management portal', board.includes('href="/"') && board.includes('ManagementPortal'));
-expect('attention queue supports severity filtering', board.includes('Severityfilter') && board.includes("severity==='ALL'||a.severity===severity"));
-expect('attention queue supports type and technician filtering', board.includes('Alerttypefilter') && board.includes('Technicianfilter'));
-expect('attention priority is high severity then oldest first', board.includes("x.severity==='HIGH'?0:1") && board.includes('ageMs(b.since)-ageMs(a.since)'));
-expect('attention aging is human readable', board.includes('functionageLabel') && board.includes("`${h}h${m}m`"));
-expect('attention details can jump to related operational section', board.includes('scrollIntoView({behavior:\'smooth\'') && board.includes('Viewrelateddetails'));
-expect('pending exceptions link to management review surface', board.includes('OpenManagementPortaltoreview'));
-expect('location state distinguishes missing GPS', board.includes('NOGPSREPORTED'));
-expect('filters are stateful across snapshot refresh', board.includes('Filtersstayselectedduringautomaticrefresh'));
+expect('board uses authenticated API client', board.includes("apiJson<Feed>('/gps/operations-map',{},session)"));
+expect('board keeps 15 second operational refresh', board.includes('setInterval(load,15000)'));
+expect('board renders free MapLibre/OpenStreetMap operations map', board.includes("import('maplibre-gl')") && board.includes('tile.openstreetmap.org'));
+expect('board exposes live technician, subscriber, NAP and work-order layers', board.includes('feed.technicians') && board.includes('feed.subscribers') && board.includes('feed.naps') && board.includes('feed.workOrders'));
+expect('board filters offline technicians from online field teams', board.includes("feed.technicians.filter(t=>t.status!=='OFFLINE')"));
+expect('board distinguishes fresh and stale technician GPS', board.includes('t.isFresh') && board.includes('t.isStale'));
+expect('board uses authenticated Smart Next endpoint', board.includes("apiJson(`/work-orders/smart-next?technicianId=${encodeURIComponent(t.id)}&lat=${t.lat}&lng=${t.lng}`,{},session)"));
+expect('Smart Next remains recommendation only', board.includes('Recommendationonly.Noassignment,work-orderorder,orjobstatusischangedfromthismap.'));
+expect('geographic queue remains no-auto-reorder', board.includes('NOAUTOREORDER'));
+expect('map sequence numbers Smart Next stops', board.includes('wfm-smart-map-stop') && board.includes('x.sequence||i+1'));
+expect('selected technician can hand off to controlled dispatch', board.includes('Opencontrolleddispatch→'));
 expect('reports use authenticated summary endpoint', reports.includes('apiJson<Summary>(`/reports/summary?range=${range}`,{},session)'));
 expect('reports expose daily weekly monthly periods', reports.includes("['daily','weekly','monthly']"));
 expect('reports expose corrected backlog KPI', reports.includes('label="Backlog"') && reports.includes('data.totals.pending'));
@@ -39,4 +39,4 @@ expect('team view documents latest-assignment semantics', reports.includes('late
 expect('team and technician views avoid automatic personnel ranking', reports.includes('doesnotscoreorautomaticallyrankemployees') && reports.includes('notanautomaticpersonnelranking'));
 expect('reports expose technician execution performance without auto ranking', reports.includes('TechnicianExecutionPerformance'));
 
-console.log('Live Operations and Supervisor KPI web contract gate passed.');
+console.log('Live GPS Operations and Supervisor KPI web contract gate passed.');
