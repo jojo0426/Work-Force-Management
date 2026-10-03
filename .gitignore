@@ -13,3 +13,4 @@ android
 coverage
 .next
 out
+web/next-env.d.ts

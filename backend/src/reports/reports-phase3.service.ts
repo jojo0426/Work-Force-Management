@@ -33,8 +33,19 @@ export class ReportsPhase3Service {
     const pending=draft+assigned+working+onHold+fbIssue+custIssue;
     const completionRate=total>0?Number(((completed/total)*100).toFixed(2)):0;
     const techPerformance=await this.prisma.jobExecution.groupBy({by:['technicianId'],where:{createdAt:{gte:startDate,lte:endDate}},_count:true,_avg:{downloadMbps:true,uploadMbps:true}});
-    const avgCompletion=await this.prisma.$queryRaw`SELECT AVG(EXTRACT(EPOCH FROM (completed_at - started_at))/3600) as avg_hours FROM job_executions WHERE completed_at IS NOT NULL AND started_at IS NOT NULL AND created_at >= ${startDate} AND created_at <= ${endDate}`;
-    const rawAverage=(avgCompletion as any)[0]?.avg_hours; const avgCompletionHours=rawAverage==null?0:Number(rawAverage);
+    const completedExecutions=await this.prisma.jobExecution.findMany({
+      where:{
+        createdAt:{gte:startDate,lte:endDate},
+        completedAt:{not:null}
+      },
+      select:{startedAt:true,completedAt:true}
+    });
+    const completionDurations=completedExecutions
+      .filter(e=>e.completedAt&&e.startedAt)
+      .map(e=>(e.completedAt!.getTime()-e.startedAt.getTime())/3600000);
+    const avgCompletionHours=completionDurations.length
+      ? completionDurations.reduce((sum,hours)=>sum+hours,0)/completionDurations.length
+      : 0;
 
     // Team reporting uses the latest assignment per work order so reassignment history cannot double-count workload.
     const [teams, periodWorkOrders, periodExecutions] = await Promise.all([

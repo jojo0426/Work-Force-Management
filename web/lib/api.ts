@@ -1,4 +1,4 @@
-export const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+export const API = '/api/v1';
 
 export type ManagementRole = 'JOB_CONTROLLER' | 'SUPERVISOR' | 'ADMINISTRATOR';
 export type SessionUser = { id: string; email: string; name: string; role: string; teamId?: string | null };

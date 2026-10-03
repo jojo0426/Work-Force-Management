@@ -17,7 +17,7 @@ const checks: Array<[string, boolean]> = [
   ['draft included in backlog', compact.includes('draft+assigned+working+onHold+fbIssue+custIssue')],
   ['on hold included in summary', compact.includes("status:'ON_HOLD'") && compact.includes('onHold')],
   ['completion rate guarded against zero total', compact.includes('total>0?') && compact.includes(':0')],
-  ['average completion requires start timestamp', compact.includes('started_atISNOTNULL')],
+  ['average completion requires start timestamp', compact.includes('select:{startedAt:true,completedAt:true}') && compact.includes('.filter(e=>e.completedAt&&e.startedAt)')],
   ['Excel WO export is range scoped', compact.includes('workOrder.findMany({where:reportWhere')],
   ['Excel audit export is range scoped', compact.includes('auditLog.findMany({where:reportWhere')],
   ['team reporting selects latest assignment only', compact.includes("orderBy:{assignedAt:'desc'},take:1")],
