@@ -39,7 +39,13 @@ export default function ManagementQuickNav() {
     <>
       <aside className="fb-sidebar" aria-label="FiberBlaze WFM navigation">
         <div className="fb-brand">
-          <div className="fb-brand-mark"><span>FIBER</span><strong>BLAZE</strong></div>
+          <div className="fb-brand-mark fb-brand-logo-wrap">
+            <img
+              className="fb-brand-logo"
+              src="/images/fiberblaze-logo.png"
+              alt="FiberBlaze"
+            />
+          </div>
           <div className="fb-brand-copy">
             <div className="fb-brand-name">FiberBlaze</div>
             <div className="fb-brand-sub">Workforce Management</div>
