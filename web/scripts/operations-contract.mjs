@@ -14,8 +14,8 @@ const layout = readFileSync(resolve(process.cwd(), 'app/layout.tsx'), 'utf8').re
 expect('management layout mounts quick navigation', layout.includes('<ManagementQuickNav/>'));
 expect('navigation is hidden without an authorized session', nav.includes("if(!authorized)returnnull"));
 expect('navigation restricts management roles', nav.includes("['JOB_CONTROLLER','SUPERVISOR','ADMINISTRATOR'].includes(session.user.role)"));
-expect('navigation exposes Live Operations route', nav.includes('href="/operations"') && nav.includes('LiveOperations'));
-expect('navigation exposes Supervisor KPI route', nav.includes('href="/reports"') && nav.includes('SupervisorKPIs'));
+expect('navigation exposes Live GPS Operations route', nav.includes('href:\'/operations\'') && nav.includes("label:'LiveGPSOperations'"));
+expect('navigation exposes Reports & KPIs route', nav.includes('href:\'/reports\'') && nav.includes("label:'Reports&KPIs'"));
 expect('board uses authenticated API client', board.includes("apiJson<Snapshot>('/phase4/operations/live',{},active)"));
 expect('board keeps 15 second operational refresh', board.includes('setInterval(()=>refresh(session),15000)'));
 expect('board returns to management portal', board.includes('href="/"') && board.includes('ManagementPortal'));
