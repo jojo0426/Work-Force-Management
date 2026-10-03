@@ -5,9 +5,15 @@ import { usePathname } from 'next/navigation';
 import { loadSession } from '../lib/api';
 
 const links = [
-  { href: '/', label: 'Management', icon: '▦' },
-  { href: '/operations', label: 'Live Operations', icon: '◉' },
+  { href: '/', label: 'Command Center', icon: '▦' },
+  { href: '/work-orders', label: 'Work Orders', icon: '▤' },
+  { href: '/dispatch', label: 'Dispatch & Smart Next', icon: '➜' },
+  { href: '/operations', label: 'Live GPS Operations', icon: '◉' },
+  { href: '/evidence', label: 'Evidence & Exceptions', icon: '◈' },
   { href: '/reports', label: 'Reports & KPIs', icon: '▥' },
+  { href: '/users', label: 'Users & Teams', icon: '♟' },
+  { href: '/audit', label: 'Audit Trail', icon: '≡' },
+  { href: '/integrations', label: 'Integrations', icon: '⌘' },
 ];
 
 export default function ManagementQuickNav() {
@@ -33,24 +39,22 @@ export default function ManagementQuickNav() {
     <>
       <aside className="fb-sidebar" aria-label="FiberBlaze WFM navigation">
         <div className="fb-brand">
-          <div className="fb-brand-mark">FB</div>
-          <div>
+          <div className="fb-brand-mark"><span>FIBER</span><strong>BLAZE</strong></div>
+          <div className="fb-brand-copy">
             <div className="fb-brand-name">FiberBlaze</div>
             <div className="fb-brand-sub">Workforce Management</div>
           </div>
         </div>
-        <div className="fb-nav-label">Operations</div>
-        <nav className="fb-nav">{navLinks}</nav>
-        <div className="fb-nav-label">Workspace</div>
-        <div style={{padding:'9px 11px',fontSize:11,color:'#737b88',lineHeight:1.55}}>
-          Dispatch, field exceptions, technician proximity and Smart Next remain management-controlled.
-        </div>
+        <div className="fb-nav-label">Field Operations</div>
+        <nav className="fb-nav">{navLinks.slice(0,5)}</nav>
+        <div className="fb-nav-label">Management</div>
+        <nav className="fb-nav">{navLinks.slice(5)}</nav>
         <div className="fb-sidebar-foot">
-          <div className="fb-status"><span className="fb-status-dot"/><span>WFM workspace active</span></div>
-          <div style={{fontSize:10,color:'#555e6b',marginTop:7}}>FiberBlaze • Field Operations</div>
+          <div className="fb-status"><span className="fb-status-dot"/><span>Operations workspace online</span></div>
+          <div className="fb-sidebar-note">Live GPS • Subscriber & NAP • Controlled dispatch</div>
         </div>
       </aside>
-      <nav className="fb-mobile-nav" aria-label="Mobile WFM navigation">{navLinks}</nav>
+      <nav className="fb-mobile-nav" aria-label="Mobile WFM navigation">{navLinks.slice(0,5)}</nav>
     </>
   );
 }
