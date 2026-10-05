@@ -35,7 +35,8 @@
                     "test:controlled-dispatch-database-e2e":  "ts-node src/phase4/controlled-dispatch-database-e2e.ts",
                     "test:geographic-database-e2e":  "ts-node src/phase4/geographic-database-e2e.ts",
                     "test:geographic-browser-fixture":  "ts-node src/phase4/geographic-browser-fixture.ts",
-                    "test:admin-management":  "ts-node src/users/admin-management-selftest.ts"
+                    "test:admin-management":  "ts-node src/users/admin-management-selftest.ts",
+                    "test:integration-queue-foundation": "ts-node src/integration/integration-queue-foundation-selftest.ts"
                 },
     "prisma":  {
                    "seed":  "ts-node prisma/seed.ts"
