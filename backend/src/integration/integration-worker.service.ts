@@ -2,7 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { IntegrationService } from './integration.service';
 import { IntegrationExecutorService } from './integration-executor.service';
 
-export type IntegrationWorkerHandlerResult = { externalActionsExecuted?: boolean } | void;
+export type IntegrationWorkerHandlerResult = { externalActionsExecuted?: boolean } | undefined;
 export type IntegrationWorkerHandler = (payload: unknown, job?: any) => Promise<IntegrationWorkerHandlerResult> | IntegrationWorkerHandlerResult;
 
 @Injectable()
@@ -63,8 +63,7 @@ export class IntegrationWorkerService {
 
     try {
       const handlerResult = await handler(job.payload, job);
-      const externalActionsExecuted =
-        handlerResult !== undefined && handlerResult.externalActionsExecuted === true;
+      const externalActionsExecuted = handlerResult?.externalActionsExecuted === true;
       const completed = await this.integration.completeClaimedJob(job.id, claimToken, now);
       return {
         status: 'COMPLETED' as const,
