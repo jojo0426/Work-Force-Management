@@ -37,7 +37,8 @@
                     "test:geographic-browser-fixture":  "ts-node src/phase4/geographic-browser-fixture.ts",
                     "test:admin-management":  "ts-node src/users/admin-management-selftest.ts",
                     "test:integration-queue-foundation": "ts-node src/integration/integration-queue-foundation-selftest.ts",
-                    "test:integration-queue-service": "ts-node src/integration/integration-queue-service-selftest.ts"
+                    "test:integration-queue-service": "ts-node src/integration/integration-queue-service-selftest.ts",
+                    "test:integration-queue-database-e2e": "ts-node src/integration/integration-queue-database-e2e.ts"
                 },
     "prisma":  {
                    "seed":  "ts-node prisma/seed.ts"
