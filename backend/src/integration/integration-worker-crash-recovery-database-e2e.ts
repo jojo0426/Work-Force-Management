@@ -33,15 +33,15 @@ async function main() {
     );
     jobIds.push(queued.job.id);
 
-    const claimedAt = new Date(Date.now() - 120_000);
-    const abandoned = await service.claimNextJob(claimedAt);
+    const claimNow = new Date();
+    const abandoned = await service.claimNextJob(claimNow);
     ok('worker A acquired isolated job before simulated crash', abandoned?.id === queued.job.id && abandoned.status === 'PROCESSING');
     ok('abandoned claim has ownership token', !!abandoned?.claimToken);
     const staleToken = abandoned!.claimToken!;
 
     console.log('');
     console.log('=== 2. RECOVER ABANDONED LEASE ===');
-    const recoveryNow = new Date();
+    const recoveryNow = new Date(claimNow.getTime() + 120_000);
     const recovery = await service.recoverStaleClaims(recoveryNow, 60_000, 1_000, 10);
     ok('expired abandoned claim recovered exactly once', recovery.recovered === 1 && recovery.failed === 0);
     ok('recovery reports no external execution', recovery.externalActionsExecuted === false);
@@ -114,11 +114,11 @@ async function main() {
       3,
     );
     jobIds.push(raceQueued.job.id);
-    const raceClaimAt = new Date(Date.now() - 120_000);
-    const raceAbandoned = await service.claimNextJob(raceClaimAt);
+    const raceClaimNow = new Date();
+    const raceAbandoned = await service.claimNextJob(raceClaimNow);
     ok('restart-race fixture is abandoned in PROCESSING', raceAbandoned?.id === raceQueued.job.id && raceAbandoned.status === 'PROCESSING');
 
-    const raceRecoveryNow = new Date();
+    const raceRecoveryNow = new Date(raceClaimNow.getTime() + 120_000);
     const raceRecovery = await service.recoverStaleClaims(raceRecoveryNow, 60_000, 0, 10);
     ok('restart-race abandoned claim recovered once', raceRecovery.recovered === 1);
 
