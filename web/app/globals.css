@@ -152,3 +152,273 @@
     min-height: 38px;
   }
 }
+/* =========================================================
+   USERS & TEAMS — ADMINISTRATOR CREATE USER FORM
+   ========================================================= */
+
+.wfm-user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.wfm-user-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 18px;
+  width: 100%;
+}
+
+.wfm-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.wfm-form-field label {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wfm-text-muted, #64748b);
+}
+
+.wfm-form-field input,
+.wfm-form-field select {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+}
+
+.wfm-user-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.wfm-user-submit {
+  min-width: 150px;
+  min-height: 44px;
+  margin: 0;
+}
+
+.wfm-user-form-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wfm-user-form-info p {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .wfm-user-form-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .wfm-user-form-actions {
+    align-items: stretch;
+  }
+
+  .wfm-user-submit {
+    width: 100%;
+  }
+}
+/* =========================================================
+   USERS & TEAMS — ADMIN MANAGEMENT
+   ========================================================= */
+
+.wfm-success {
+  padding: 11px 13px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  border: 1px solid #bce9d3;
+  background: #eaf9f1;
+  color: #087a4d;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.wfm-team-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin: 16px 0 14px;
+}
+
+.wfm-team-create .wfm-primary-btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.wfm-team-list {
+  border-top: 1px solid var(--fb-border);
+  margin-top: 8px;
+}
+
+.wfm-team-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid #edf2fb;
+}
+
+.wfm-team-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.wfm-team-copy b {
+  display: block;
+  color: var(--fb-blue-950);
+}
+
+.wfm-team-copy small {
+  display: block;
+  color: var(--fb-muted);
+  margin-top: 3px;
+}
+
+.wfm-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 270px;
+}
+
+.wfm-user-actions button {
+  min-height: 34px;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.wfm-admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(7, 19, 77, .46);
+  backdrop-filter: blur(4px);
+}
+
+.wfm-admin-modal {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--fb-border);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(7, 19, 77, .28);
+}
+
+.wfm-admin-modal-small {
+  width: min(520px, 100%);
+}
+
+.wfm-admin-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--fb-border);
+}
+
+.wfm-admin-modal-head h3 {
+  margin: 3px 0 0;
+  color: var(--fb-blue-950);
+}
+
+.wfm-admin-modal-head small {
+  display: block;
+  margin-top: 4px;
+  color: var(--fb-muted);
+}
+
+@media (max-width: 760px) {
+  .wfm-team-create {
+    grid-template-columns: 1fr;
+  }
+
+  .wfm-team-create .wfm-primary-btn {
+    width: 100%;
+  }
+
+  .wfm-team-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .wfm-team-row .wfm-secondary-btn {
+    margin-left: 37px;
+  }
+
+  .wfm-user-actions {
+    min-width: 210px;
+  }
+
+  .wfm-user-actions button {
+    flex: 1 1 auto;
+  }
+
+  .wfm-admin-modal-backdrop {
+    padding: 10px;
+  }
+
+  .wfm-admin-modal {
+    max-height: calc(100vh - 20px);
+    padding: 15px;
+  }
+}
+
+/* =========================================================
+   WFM Administrator Permanent Delete Confirmation
+   ========================================================= */
+
+.wfm-delete-confirm {
+  display: grid;
+  gap: 14px;
+}
+
+.wfm-delete-confirm p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.wfm-delete-warning {
+  padding: 11px 12px;
+  border: 1px solid rgba(185, 28, 28, .18);
+  border-radius: 9px;
+  background: rgba(185, 28, 28, .055);
+  color: #7f1d1d;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.wfm-delete-error {
+  padding: 11px 12px;
+  border: 1px solid rgba(185, 28, 28, .28);
+  border-radius: 9px;
+  background: rgba(185, 28, 28, .08);
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 750;
+}
