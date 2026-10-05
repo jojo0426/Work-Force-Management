@@ -66,30 +66,37 @@ export class IntegrationService {
 
   async claimNextJob(now = new Date()) {
     return this.prisma.$transaction(async (tx) => {
-      const candidate = await tx.integrationJob.findFirst({
-        where: { status: 'PENDING', nextAttemptAt: { lte: now } },
-        orderBy: [{ nextAttemptAt: 'asc' }, { createdAt: 'asc' }],
-      });
-      if (!candidate) return null;
+      // A competing worker can win the first candidate between discovery and
+      // updateMany. Keep scanning so this worker can claim another eligible job
+      // instead of reporting IDLE while runnable work remains.
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const candidate = await tx.integrationJob.findFirst({
+          where: { status: 'PENDING', nextAttemptAt: { lte: now } },
+          orderBy: [{ nextAttemptAt: 'asc' }, { createdAt: 'asc' }],
+        });
+        if (!candidate) return null;
 
-      const claimToken = randomUUID();
-      const claimed = await tx.integrationJob.updateMany({
-        where: {
-          id: candidate.id,
-          status: 'PENDING',
-          nextAttemptAt: { lte: now },
-          claimToken: null,
-        },
-        data: {
-          status: 'PROCESSING',
-          claimToken,
-          claimedAt: now,
-          lastAttemptAt: now,
-        },
-      });
-      if (claimed.count !== 1) return null;
+        const claimToken = randomUUID();
+        const claimed = await tx.integrationJob.updateMany({
+          where: {
+            id: candidate.id,
+            status: 'PENDING',
+            nextAttemptAt: { lte: now },
+            claimToken: null,
+          },
+          data: {
+            status: 'PROCESSING',
+            claimToken,
+            claimedAt: now,
+            lastAttemptAt: now,
+          },
+        });
+        if (claimed.count !== 1) continue;
 
-      return tx.integrationJob.findUnique({ where: { id: candidate.id } });
+        return tx.integrationJob.findUnique({ where: { id: candidate.id } });
+      }
+
+      return null;
     });
   }
 
