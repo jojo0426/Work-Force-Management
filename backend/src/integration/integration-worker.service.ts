@@ -63,11 +63,13 @@ export class IntegrationWorkerService {
 
     try {
       const handlerResult = await handler(job.payload, job);
+      const externalActionsExecuted =
+        handlerResult !== undefined && handlerResult.externalActionsExecuted === true;
       const completed = await this.integration.completeClaimedJob(job.id, claimToken, now);
       return {
         status: 'COMPLETED' as const,
         job: completed,
-        externalActionsExecuted: handlerResult?.externalActionsExecuted === true,
+        externalActionsExecuted,
       };
     } catch (error) {
       const failed = await this.integration.failClaimedJob(job.id, claimToken, error, retryDelayMs, now);
