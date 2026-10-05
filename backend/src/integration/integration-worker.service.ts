@@ -1,13 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { IntegrationService } from './integration.service';
+import { IntegrationExecutorService } from './integration-executor.service';
 
-export type IntegrationWorkerHandler = (payload: unknown) => Promise<void> | void;
+export type IntegrationWorkerHandlerResult = { externalActionsExecuted?: boolean } | void;
+export type IntegrationWorkerHandler = (payload: unknown, job?: any) => Promise<IntegrationWorkerHandlerResult> | IntegrationWorkerHandlerResult;
 
 @Injectable()
 export class IntegrationWorkerService {
   private readonly handlers = new Map<string, IntegrationWorkerHandler>();
 
-  constructor(private readonly integration: IntegrationService) {}
+  constructor(
+    private readonly integration: IntegrationService,
+    @Optional() private readonly executor?: IntegrationExecutorService,
+  ) {}
 
   registerHandler(target: string, handler: IntegrationWorkerHandler): void {
     const normalizedTarget = String(target || '').trim().toUpperCase();
@@ -16,6 +21,23 @@ export class IntegrationWorkerService {
       throw new Error(`Integration worker handler already registered for ${normalizedTarget}`);
     }
     this.handlers.set(normalizedTarget, handler);
+  }
+
+  registerExecutorHandler(target: string): void {
+    const normalizedTarget = String(target || '').trim().toUpperCase();
+    this.registerHandler(normalizedTarget, async (_payload, job) => {
+      if (!this.executor) throw new Error('Integration executor is not available');
+      const result = await this.executor.execute({
+        jobId: job.id,
+        sourceSystem: String(job.sourceSystem || ''),
+        targetSystem: normalizedTarget,
+        payload: job.payload,
+      });
+      if (result.status !== 'EXECUTED') {
+        throw new Error(`Integration executor blocked ${normalizedTarget}: ${result.reason}`);
+      }
+      return { externalActionsExecuted: result.externalActionsExecuted };
+    });
   }
 
   async runOnce(now = new Date(), retryDelayMs = 30_000) {
@@ -40,9 +62,13 @@ export class IntegrationWorkerService {
     }
 
     try {
-      await handler(job.payload);
+      const handlerResult = await handler(job.payload, job);
       const completed = await this.integration.completeClaimedJob(job.id, claimToken, now);
-      return { status: 'COMPLETED' as const, job: completed, externalActionsExecuted: false };
+      return {
+        status: 'COMPLETED' as const,
+        job: completed,
+        externalActionsExecuted: handlerResult?.externalActionsExecuted === true,
+      };
     } catch (error) {
       const failed = await this.integration.failClaimedJob(job.id, claimToken, error, retryDelayMs, now);
       return { status: 'FAILED' as const, job: failed, externalActionsExecuted: false };
