@@ -50,7 +50,8 @@
                     "test:integration-worker-executor": "ts-node src/integration/integration-worker-executor-selftest.ts",
                     "test:integration-executor-database-e2e": "ts-node src/integration/integration-executor-database-e2e.ts",
                     "test:integration-executor-concurrency-database-e2e": "ts-node src/integration/integration-executor-concurrency-database-e2e.ts",
-                    "test:integration-executor-retry-exhaustion-database-e2e": "ts-node src/integration/integration-executor-retry-exhaustion-database-e2e.ts"
+                    "test:integration-executor-retry-exhaustion-database-e2e": "ts-node src/integration/integration-executor-retry-exhaustion-database-e2e.ts",
+                    "test:integration-executor-timeout-database-e2e": "ts-node src/integration/integration-executor-timeout-database-e2e.ts"
                 },
     "prisma":  {
                    "seed":  "ts-node prisma/seed.ts"
