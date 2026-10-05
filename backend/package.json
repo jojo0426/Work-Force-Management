@@ -44,7 +44,8 @@
                     "test:integration-worker-concurrency-database-e2e": "ts-node src/integration/integration-worker-concurrency-database-e2e.ts",
                     "test:integration-stale-claim-database-e2e": "ts-node src/integration/integration-stale-claim-database-e2e.ts",
                     "test:integration-worker-crash-recovery-database-e2e": "ts-node src/integration/integration-worker-crash-recovery-database-e2e.ts",
-                    "test:integration-orchestrator": "ts-node src/integration/integration-orchestrator-selftest.ts"
+                    "test:integration-orchestrator": "ts-node src/integration/integration-orchestrator-selftest.ts",
+                    "test:integration-orchestrator-database-e2e": "ts-node src/integration/integration-orchestrator-database-e2e.ts"
                 },
     "prisma":  {
                    "seed":  "ts-node prisma/seed.ts"
