@@ -39,7 +39,8 @@
                     "test:integration-queue-foundation": "ts-node src/integration/integration-queue-foundation-selftest.ts",
                     "test:integration-queue-service": "ts-node src/integration/integration-queue-service-selftest.ts",
                     "test:integration-queue-database-e2e": "ts-node src/integration/integration-queue-database-e2e.ts",
-                    "test:integration-worker": "ts-node src/integration/integration-worker-selftest.ts"
+                    "test:integration-worker": "ts-node src/integration/integration-worker-selftest.ts",
+                    "test:integration-worker-database-e2e": "ts-node src/integration/integration-worker-database-e2e.ts"
                 },
     "prisma":  {
                    "seed":  "ts-node prisma/seed.ts"
