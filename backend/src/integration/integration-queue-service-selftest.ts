@@ -50,17 +50,17 @@ function harness() {
       (!where.id || j.id === where.id) &&
       (!where.status || j.status === where.status) &&
       (where.claimToken === undefined || j.claimToken === where.claimToken) &&
-      (!where.nextAttemptAt?.lte || j.nextAttemptAt <= where.nextAttemptAt)
+      (!where.nextAttemptAt?.lte || j.nextAttemptAt <= where.nextAttemptAt.lte)
     ) ?? null,
     findMany: async ({ where, take }: any) => jobs.filter((j) =>
       (!where?.status || j.status === where.status) &&
-      (!where?.nextAttemptAt?.lte || j.nextAttemptAt <= where.nextAttemptAt)
+      (!where?.nextAttemptAt?.lte || j.nextAttemptAt <= where.nextAttemptAt.lte)
     ).slice(0, take ?? jobs.length),
     create: async ({ data }: any) => {
       if (data.idempotencyKey && jobs.some((j) => j.sourceSystem === data.sourceSystem && j.idempotencyKey === data.idempotencyKey)) {
         const e: any = new Error('Unique constraint'); e.code = 'P2002'; throw e;
       }
-      const job: Job = { id: `job-${++sequence}`, retries: 0, claimedAt: null, claimToken: null, lastAttemptAt: null, lastError: null, completedAt: null, failedAt: null, processedAt: null, createdAt: new Date(), ...data };
+      const job: Job = { id: `job-${++sequence}`, status: 'PENDING', retries: 0, maxRetries: 5, nextAttemptAt: new Date(), claimedAt: null, claimToken: null, lastAttemptAt: null, lastError: null, completedAt: null, failedAt: null, processedAt: null, createdAt: new Date(), ...data };
       jobs.push(job); return job;
     },
     updateMany: async ({ where, data }: any) => {
@@ -69,7 +69,7 @@ function harness() {
         (!where.status || j.status === where.status) &&
         (where.claimToken === undefined || j.claimToken === where.claimToken) &&
         (where.retries === undefined || j.retries === where.retries) &&
-        (!where.nextAttemptAt?.lte || j.nextAttemptAt <= where.nextAttemptAt)
+        (!where.nextAttemptAt?.lte || j.nextAttemptAt <= where.nextAttemptAt.lte)
       );
       if (!match) return { count: 0 };
       Object.assign(match, data); return { count: 1 };
