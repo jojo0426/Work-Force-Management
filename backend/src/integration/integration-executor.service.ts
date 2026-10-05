@@ -5,6 +5,7 @@ export type IntegrationExecutionContext = {
   sourceSystem: string;
   targetSystem: string;
   payload: unknown;
+  signal?: AbortSignal;
 };
 
 export type IntegrationAdapter = (context: IntegrationExecutionContext) => Promise<void> | void;
@@ -21,6 +22,7 @@ export class IntegrationExecutorService {
   private readonly adapters = new Map<string, IntegrationAdapter>();
   private readonly allowedTargets = new Set<string>();
   private executionEnabled = false;
+  private executionTimeoutMs: number | null = null;
 
   registerAdapter(target: string, adapter: IntegrationAdapter): void {
     const normalizedTarget = this.normalizeTarget(target);
@@ -36,6 +38,17 @@ export class IntegrationExecutorService {
 
   setExecutionEnabled(enabled: boolean): void {
     this.executionEnabled = enabled === true;
+  }
+
+  setExecutionTimeoutMs(timeoutMs: number | null): void {
+    if (timeoutMs === null) {
+      this.executionTimeoutMs = null;
+      return;
+    }
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new Error('Integration execution timeout must be a positive finite number');
+    }
+    this.executionTimeoutMs = Math.floor(timeoutMs);
   }
 
   async execute(context: IntegrationExecutionContext): Promise<IntegrationExecutionResult> {
@@ -64,7 +77,28 @@ export class IntegrationExecutorService {
       throw new Error(`Allowed integration target ${targetSystem} has no registered adapter`);
     }
 
-    await adapter({ ...context, targetSystem });
+    if (this.executionTimeoutMs === null) {
+      await adapter({ ...context, targetSystem });
+    } else {
+      const controller = new AbortController();
+      const timeoutMs = this.executionTimeoutMs;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error(`Integration adapter ${targetSystem} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+      try {
+        await Promise.race([
+          Promise.resolve(adapter({ ...context, targetSystem, signal: controller.signal })),
+          timeout,
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
+
     return {
       status: 'EXECUTED',
       targetSystem,
