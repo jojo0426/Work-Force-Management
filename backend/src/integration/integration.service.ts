@@ -152,6 +152,69 @@ export class IntegrationService {
     });
   }
 
+  async recoverStaleClaims(
+    now = new Date(),
+    leaseMs = 5 * 60_000,
+    retryDelayMs = 30_000,
+    take = 10,
+  ) {
+    const safeLeaseMs = Math.max(1, Math.trunc(leaseMs));
+    const safeRetryDelayMs = Math.max(0, Math.trunc(retryDelayMs));
+    const safeTake = Math.max(1, Math.min(100, Math.trunc(take)));
+    const staleBefore = new Date(now.getTime() - safeLeaseMs);
+
+    const candidates = await this.prisma.integrationJob.findMany({
+      where: {
+        status: 'PROCESSING',
+        claimedAt: { lte: staleBefore },
+        claimToken: { not: null },
+      },
+      orderBy: [{ claimedAt: 'asc' }, { createdAt: 'asc' }],
+      take: safeTake,
+    });
+
+    let recovered = 0;
+    let failed = 0;
+
+    for (const candidate of candidates) {
+      const retries = candidate.retries + 1;
+      const exhausted = retries >= candidate.maxRetries;
+      const lastError = `Integration worker claim lease expired after ${safeLeaseMs}ms`;
+      const updated = await this.prisma.integrationJob.updateMany({
+        where: {
+          id: candidate.id,
+          status: 'PROCESSING',
+          claimToken: candidate.claimToken,
+          claimedAt: candidate.claimedAt,
+          retries: candidate.retries,
+        },
+        data: {
+          status: exhausted ? 'FAILED' : 'PENDING',
+          retries,
+          nextAttemptAt: exhausted
+            ? candidate.nextAttemptAt
+            : new Date(now.getTime() + safeRetryDelayMs),
+          lastError,
+          failedAt: exhausted ? now : null,
+          claimToken: null,
+          claimedAt: null,
+        },
+      });
+
+      if (updated.count !== 1) continue;
+      if (exhausted) failed += 1;
+      else recovered += 1;
+    }
+
+    return {
+      scanned: candidates.length,
+      recovered,
+      failed,
+      staleBefore,
+      externalActionsExecuted: false,
+    };
+  }
+
   async processPendingJobs() {
     const now = new Date();
     const pending = await this.prisma.integrationJob.findMany({
