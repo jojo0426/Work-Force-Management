@@ -101,7 +101,7 @@ async function main(): Promise<void> {
     }))]);
 
     const result = await executor.execute({ jobId: 'phase5c3a-authorized', sourceSystem: 'WFM', targetSystem: 'crm', payload: {} });
-    ok('authorized provider still executes only through executor boundary', result.status === 'EXECUTED' && result.externalActionExecuted === true);
+    ok('authorized provider still executes only through executor boundary', result.status === 'EXECUTED' && result.externalActionsExecuted === true);
     ok('authorized provider executes exactly once', calls === 1);
     ok('provider receives canonical target from executor', seenTarget === 'CRM');
   });
