@@ -128,7 +128,7 @@ async function main(): Promise<void> {
     let attempts = 0;
     executor.registerAdapter('CRM', async () => {
       attempts += 1;
-      return { status: 'PERMANENT_FAILURE', message: 'controlled provider rejection' };
+      return { status: 'REJECTED', message: 'controlled provider rejection' };
     });
 
     const result = await worker.runOnce(new Date('2026-10-06T01:00:00.000Z'), 30);
