@@ -9,7 +9,7 @@ function ok(name: string, condition: boolean): void {
   console.log(`PASS: ${name}`);
 }
 
-function main(): void {
+async function main(): Promise<void> {
   console.log('\n=== PHASE 5C.1C PRODUCTION POLICY WIRING / BYPASS HARDENING ===');
 
   const appImports: unknown[] = Reflect.getMetadata('imports', AppModule) ?? [];
@@ -17,20 +17,42 @@ function main(): void {
 
   const integrationProviders: unknown[] = Reflect.getMetadata('providers', IntegrationModule) ?? [];
   ok('IntegrationModule provides IntegrationPolicyService', integrationProviders.includes(IntegrationPolicyService));
-  ok('IntegrationModule provides IntegrationExecutorService', integrationProviders.includes(IntegrationExecutorService));
+  ok('IntegrationModule provides IntegrationExecutorService directly', integrationProviders.includes(IntegrationExecutorService));
+  ok('executor has no alternate factory/provider registration', !integrationProviders.some((provider: any) => provider && typeof provider === 'object' && provider.provide === IntegrationExecutorService));
 
   const executorDependencies: unknown[] = Reflect.getMetadata('design:paramtypes', IntegrationExecutorService) ?? [];
-  ok('production executor declares policy dependency', executorDependencies[0] === IntegrationPolicyService);
+  ok('production executor declares IntegrationPolicyService dependency', executorDependencies[0] === IntegrationPolicyService);
 
-  const source = IntegrationExecutorService.toString();
-  ok('executor policy takes precedence over mutable execution flag', source.includes('policy ? policy.executionEnabled : this.executionEnabled'));
-  ok('executor policy takes precedence over mutable target allow-list', source.includes("policy\n      ? this.policyService!.isTargetAllowed(targetSystem)\n      : this.allowedTargets.has(targetSystem)"));
-  ok('executor policy takes precedence over mutable timeout', source.includes('policy ? policy.executionTimeoutMs : this.executionTimeoutMs'));
+  let adapterCalls = 0;
+  const failClosedPolicy = {
+    getPolicy: () => ({
+      executionEnabled: false,
+      allowedTargets: [] as string[],
+      executionTimeoutMs: 30_000,
+      retryDelayMs: 30_000,
+    }),
+    isTargetAllowed: () => false,
+  } as IntegrationPolicyService;
 
-  const moduleSource = IntegrationModule.toString();
-  ok('module itself contains no runtime executor mutation', !moduleSource.includes('setExecutionEnabled') && !moduleSource.includes('allowTarget'));
+  const executor = new IntegrationExecutorService(failClosedPolicy);
+  executor.registerAdapter('CRM', async () => { adapterCalls += 1; });
+  executor.setExecutionEnabled(true);
+  executor.allowTarget('CRM');
+
+  const result = await executor.execute({
+    jobId: 'phase5c1c-wiring',
+    sourceSystem: 'WFM',
+    targetSystem: 'CRM',
+    payload: {},
+  });
+
+  ok('injected production policy remains authoritative over legacy setters', result.status === 'BLOCKED' && result.reason === 'EXECUTION_DISABLED');
+  ok('policy-governed blocked execution invokes no adapter', adapterCalls === 0 && result.externalActionsExecuted === false);
 
   console.log('Phase 5C.1C production policy wiring / bypass hardening passed.');
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
