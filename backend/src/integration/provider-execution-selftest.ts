@@ -1,6 +1,9 @@
 import { IntegrationAdapterLifecycleService } from './integration-adapter-lifecycle.service';
 import { IntegrationAdapterRegistryService } from './integration-adapter-registry.service';
-import { IntegrationExecutorService } from './integration-executor.service';
+import {
+  IntegrationExecutionError,
+  IntegrationExecutorService,
+} from './integration-executor.service';
 import { IntegrationPolicyService } from './integration-policy.service';
 import { ProviderAdapter } from './provider-adapter.contract';
 import { providerAdapterDefinition } from './provider-adapter.factory';
@@ -48,6 +51,23 @@ function stack(adapter: ProviderAdapter) {
   return { executor, registry, lifecycle };
 }
 
+async function expectExecutionError(
+  action: () => Promise<unknown>,
+  classification: IntegrationExecutionError['classification'],
+  retryable: boolean,
+): Promise<IntegrationExecutionError> {
+  try {
+    await action();
+  } catch (error) {
+    ok('provider failure uses IntegrationExecutionError boundary', error instanceof IntegrationExecutionError);
+    if (!(error instanceof IntegrationExecutionError)) throw error;
+    ok(`provider failure is classified ${classification}`, error.classification === classification);
+    ok(`provider failure retryable is ${retryable}`, error.retryable === retryable);
+    return error;
+  }
+  throw new Error('FAIL: provider failure should reject execution');
+}
+
 async function main(): Promise<void> {
   console.log('\n=== PHASE 5C.4 CONTROLLED PROVIDER EXECUTION FOUNDATION ===');
 
@@ -74,6 +94,7 @@ async function main(): Promise<void> {
     const result = await executor.execute({ jobId: 'phase5c4-denied', sourceSystem: 'WFM', targetSystem: 'CRM', payload: { case: 'denied' } });
     ok('provider target must be explicitly allow-listed', result.status === 'BLOCKED' && result.reason === 'TARGET_NOT_ALLOWED');
     ok('non-allow-listed provider is never invoked', calls === 0);
+    ok('denied target reports no external action', result.externalActionsExecuted === false);
   });
 
   await withEnv({ INTEGRATION_EXECUTION_ENABLED: 'true', INTEGRATION_ALLOWED_TARGETS: 'CRM' }, async () => {
@@ -106,13 +127,16 @@ async function main(): Promise<void> {
     let calls = 0;
     const { executor } = stack(provider(async () => {
       calls += 1;
-      return { status: 'PERMANENT_FAILURE', message: 'controlled provider rejection' };
+      return { status: 'REJECTED', message: 'controlled provider rejection' };
     }));
 
-    const result = await executor.execute({ jobId: 'phase5c4-permanent', sourceSystem: 'WFM', targetSystem: 'CRM', payload: {} });
-    ok('provider permanent failure is classified by executor', result.status === 'FAILED' && result.failureClass === 'PERMANENT');
-    ok('provider permanent failure is not reported as external success', result.externalActionsExecuted === false);
-    ok('provider permanent failure executes one controlled attempt', calls === 1);
+    const error = await expectExecutionError(
+      () => executor.execute({ jobId: 'phase5c4-permanent', sourceSystem: 'WFM', targetSystem: 'CRM', payload: {} }),
+      'PERMANENT',
+      false,
+    );
+    ok('provider rejection preserves diagnostic', error.message === 'controlled provider rejection');
+    ok('provider rejection executes one controlled attempt', calls === 1);
   });
 
   await withEnv({ INTEGRATION_EXECUTION_ENABLED: 'true', INTEGRATION_ALLOWED_TARGETS: 'CRM' }, async () => {
@@ -122,9 +146,12 @@ async function main(): Promise<void> {
       throw new Error('controlled transient provider failure');
     }));
 
-    const result = await executor.execute({ jobId: 'phase5c4-transient', sourceSystem: 'WFM', targetSystem: 'CRM', payload: {} });
-    ok('provider exception is classified transient', result.status === 'FAILED' && result.failureClass === 'TRANSIENT');
-    ok('provider exception is not reported as external success', result.externalActionsExecuted === false);
+    const error = await expectExecutionError(
+      () => executor.execute({ jobId: 'phase5c4-transient', sourceSystem: 'WFM', targetSystem: 'CRM', payload: {} }),
+      'TRANSIENT',
+      true,
+    );
+    ok('provider exception preserves diagnostic', error.message === 'controlled transient provider failure');
     ok('provider exception executes one controlled attempt', calls === 1);
   });
 
