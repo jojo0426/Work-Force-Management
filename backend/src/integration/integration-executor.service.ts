@@ -8,7 +8,32 @@ export type IntegrationExecutionContext = {
   signal?: AbortSignal;
 };
 
-export type IntegrationAdapter = (context: IntegrationExecutionContext) => Promise<void> | void;
+export type IntegrationAdapterResult =
+  | void
+  | { status: 'SUCCESS' }
+  | { status: 'REJECTED'; message?: string }
+  | { status: 'RETRYABLE_FAILURE'; message?: string };
+
+export type IntegrationAdapter = (
+  context: IntegrationExecutionContext,
+) => Promise<IntegrationAdapterResult> | IntegrationAdapterResult;
+
+export type IntegrationFailureClassification =
+  | 'TRANSIENT'
+  | 'PERMANENT'
+  | 'TIMEOUT'
+  | 'INVALID_RESPONSE';
+
+export class IntegrationExecutionError extends Error {
+  constructor(
+    message: string,
+    readonly classification: IntegrationFailureClassification,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = 'IntegrationExecutionError';
+  }
+}
 
 export type IntegrationExecutionResult = {
   status: 'EXECUTED' | 'BLOCKED';
@@ -74,30 +99,51 @@ export class IntegrationExecutorService {
 
     const adapter = this.adapters.get(targetSystem);
     if (!adapter) {
-      throw new Error(`Allowed integration target ${targetSystem} has no registered adapter`);
+      throw new IntegrationExecutionError(
+        `Allowed integration target ${targetSystem} has no registered adapter`,
+        'PERMANENT',
+        false,
+      );
     }
 
-    if (this.executionTimeoutMs === null) {
-      await adapter({ ...context, targetSystem });
-    } else {
-      const controller = new AbortController();
-      const timeoutMs = this.executionTimeoutMs;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new Error(`Integration adapter ${targetSystem} timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-      });
-      try {
-        await Promise.race([
-          Promise.resolve(adapter({ ...context, targetSystem, signal: controller.signal })),
-          timeout,
-        ]);
-      } finally {
-        if (timer) clearTimeout(timer);
+    let adapterResult: IntegrationAdapterResult;
+    try {
+      if (this.executionTimeoutMs === null) {
+        adapterResult = await adapter({ ...context, targetSystem });
+      } else {
+        const controller = new AbortController();
+        const timeoutMs = this.executionTimeoutMs;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new IntegrationExecutionError(
+              `Integration adapter ${targetSystem} timed out after ${timeoutMs}ms`,
+              'TIMEOUT',
+              true,
+            ));
+          }, timeoutMs);
+        });
+        try {
+          adapterResult = await Promise.race([
+            Promise.resolve(adapter({ ...context, targetSystem, signal: controller.signal })),
+            timeout,
+          ]);
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
       }
+    } catch (error) {
+      if (error instanceof IntegrationExecutionError) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      throw new IntegrationExecutionError(
+        `Integration adapter ${targetSystem} failed: ${message}`,
+        'TRANSIENT',
+        true,
+      );
     }
+
+    this.validateAdapterResult(targetSystem, adapterResult);
 
     return {
       status: 'EXECUTED',
@@ -105,6 +151,44 @@ export class IntegrationExecutorService {
       reason: null,
       externalActionsExecuted: true,
     };
+  }
+
+  private validateAdapterResult(targetSystem: string, result: IntegrationAdapterResult): void {
+    if (result === undefined) return;
+    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+      throw new IntegrationExecutionError(
+        `Integration adapter ${targetSystem} returned an invalid response`,
+        'INVALID_RESPONSE',
+        false,
+      );
+    }
+
+    const status = (result as any).status;
+    const message = typeof (result as any).message === 'string'
+      ? String((result as any).message).trim()
+      : '';
+
+    if (status === 'SUCCESS') return;
+    if (status === 'REJECTED') {
+      throw new IntegrationExecutionError(
+        message || `Integration adapter ${targetSystem} rejected the request`,
+        'PERMANENT',
+        false,
+      );
+    }
+    if (status === 'RETRYABLE_FAILURE') {
+      throw new IntegrationExecutionError(
+        message || `Integration adapter ${targetSystem} reported a retryable failure`,
+        'TRANSIENT',
+        true,
+      );
+    }
+
+    throw new IntegrationExecutionError(
+      `Integration adapter ${targetSystem} returned an invalid response`,
+      'INVALID_RESPONSE',
+      false,
+    );
   }
 
   private normalizeTarget(target: string): string {
