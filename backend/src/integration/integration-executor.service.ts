@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { IntegrationPolicyService } from './integration-policy.service';
 
 export type IntegrationExecutionContext = {
   jobId: string;
@@ -49,6 +50,8 @@ export class IntegrationExecutorService {
   private executionEnabled = false;
   private executionTimeoutMs: number | null = null;
 
+  constructor(private readonly policyService?: IntegrationPolicyService) {}
+
   registerAdapter(target: string, adapter: IntegrationAdapter): void {
     const normalizedTarget = this.normalizeTarget(target);
     if (this.adapters.has(normalizedTarget)) {
@@ -78,8 +81,14 @@ export class IntegrationExecutorService {
 
   async execute(context: IntegrationExecutionContext): Promise<IntegrationExecutionResult> {
     const targetSystem = this.normalizeTarget(context.targetSystem);
+    const policy = this.policyService?.getPolicy();
+    const executionEnabled = policy ? policy.executionEnabled : this.executionEnabled;
+    const targetAllowed = policy
+      ? this.policyService!.isTargetAllowed(targetSystem)
+      : this.allowedTargets.has(targetSystem);
+    const executionTimeoutMs = policy ? policy.executionTimeoutMs : this.executionTimeoutMs;
 
-    if (!this.executionEnabled) {
+    if (!executionEnabled) {
       return {
         status: 'BLOCKED',
         targetSystem,
@@ -88,7 +97,7 @@ export class IntegrationExecutorService {
       };
     }
 
-    if (!this.allowedTargets.has(targetSystem)) {
+    if (!targetAllowed) {
       return {
         status: 'BLOCKED',
         targetSystem,
@@ -108,11 +117,11 @@ export class IntegrationExecutorService {
 
     let adapterResult: IntegrationAdapterResult;
     try {
-      if (this.executionTimeoutMs === null) {
+      if (executionTimeoutMs === null) {
         adapterResult = await adapter({ ...context, targetSystem });
       } else {
         const controller = new AbortController();
-        const timeoutMs = this.executionTimeoutMs;
+        const timeoutMs = executionTimeoutMs;
         let timer: ReturnType<typeof setTimeout> | undefined;
         const timeout = new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
