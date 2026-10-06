@@ -32,7 +32,7 @@ async function main(): Promise<void> {
       retryDelayMs: 30_000,
     }),
     isTargetAllowed: () => false,
-  } as IntegrationPolicyService;
+  } as unknown as IntegrationPolicyService;
 
   const executor = new IntegrationExecutorService(failClosedPolicy);
   executor.registerAdapter('CRM', async () => { adapterCalls += 1; });
