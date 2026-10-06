@@ -137,7 +137,7 @@ export class IntegrationExecutorService {
       if (error instanceof IntegrationExecutionError) throw error;
       const message = error instanceof Error ? error.message : String(error);
       throw new IntegrationExecutionError(
-        `Integration adapter ${targetSystem} failed: ${message}`,
+        message,
         'TRANSIENT',
         true,
       );
