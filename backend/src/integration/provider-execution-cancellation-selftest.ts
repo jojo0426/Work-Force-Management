@@ -41,23 +41,25 @@ async function main(): Promise<void> {
   }, async () => {
     const policy = new IntegrationPolicyService();
     const executor = new IntegrationExecutorService(policy);
-    let calls = 0;
-    let signalProvided = false;
-    let abortObserved = false;
-    let sideEffectCommitted = false;
+    const observed = {
+      calls: 0,
+      signalProvided: false,
+      abortObserved: false,
+      sideEffectCommitted: false,
+    };
 
     executor.registerAdapter('CRM', async (context) => {
-      calls += 1;
-      signalProvided = context.signal instanceof AbortSignal;
+      observed.calls += 1;
+      observed.signalProvided = context.signal instanceof AbortSignal;
 
       await new Promise<void>((resolve) => {
         const timer = setTimeout(() => {
-          sideEffectCommitted = true;
+          observed.sideEffectCommitted = true;
           resolve();
         }, 100);
 
         context.signal?.addEventListener('abort', () => {
-          abortObserved = true;
+          observed.abortObserved = true;
           clearTimeout(timer);
           resolve();
         }, { once: true });
@@ -86,12 +88,12 @@ async function main(): Promise<void> {
     ok('timed out provider rejects through execution error boundary', error instanceof IntegrationExecutionError);
     ok('timed out provider remains classified TIMEOUT', error?.classification === 'TIMEOUT');
     ok('timed out provider remains retryable', error?.retryable === true);
-    ok('executor provides cancellation signal to timed provider', signalProvided === true);
-    ok('provider observes executor timeout abort signal', abortObserved === true);
-    ok('timeout performs exactly one provider invocation', calls === 1);
+    ok('executor provides cancellation signal to timed provider', observed.signalProvided);
+    ok('provider observes executor timeout abort signal', observed.abortObserved);
+    ok('timeout performs exactly one provider invocation', observed.calls === 1);
 
     await new Promise((resolve) => setTimeout(resolve, 110));
-    ok('cooperative provider prevents late side effect after timeout', sideEffectCommitted === false);
+    ok('cooperative provider prevents late side effect after timeout', !observed.sideEffectCommitted);
   });
 
   await withEnv({
@@ -101,16 +103,18 @@ async function main(): Promise<void> {
   }, async () => {
     const policy = new IntegrationPolicyService();
     const executor = new IntegrationExecutorService(policy);
-    let signalProvided = false;
-    let abortObserved = false;
-    let calls = 0;
+    const observed = {
+      signalProvided: false,
+      abortObserved: false,
+      calls: 0,
+    };
 
     executor.registerAdapter('CRM', async (context) => {
-      calls += 1;
-      signalProvided = context.signal instanceof AbortSignal;
-      abortObserved = context.signal?.aborted === true;
+      observed.calls += 1;
+      observed.signalProvided = context.signal instanceof AbortSignal;
+      observed.abortObserved = context.signal?.aborted === true;
       await new Promise((resolve) => setTimeout(resolve, 5));
-      abortObserved = abortObserved || context.signal?.aborted === true;
+      observed.abortObserved = observed.abortObserved || context.signal?.aborted === true;
       return { status: 'SUCCESS' };
     });
 
@@ -121,9 +125,9 @@ async function main(): Promise<void> {
       payload: { case: 'success' },
     });
 
-    ok('successful timed execution receives cancellation signal', signalProvided === true);
-    ok('successful provider is not spuriously aborted', abortObserved === false);
-    ok('successful provider executes exactly once', calls === 1);
+    ok('successful timed execution receives cancellation signal', observed.signalProvided);
+    ok('successful provider is not spuriously aborted', !observed.abortObserved);
+    ok('successful provider executes exactly once', observed.calls === 1);
     ok('successful provider remains EXECUTED', result.status === 'EXECUTED' && result.externalActionsExecuted === true);
   });
 
