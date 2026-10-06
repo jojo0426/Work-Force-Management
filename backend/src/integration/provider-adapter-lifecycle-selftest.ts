@@ -66,7 +66,7 @@ async function main(): Promise<void> {
 
     ok('provider definitions execute no actions before lifecycle initialization', crmCalls === 0 && smsCalls === 0);
     lifecycle.initialize(definitions);
-    ok('provider lifecycle initializes exactly once', lifecycle.getStatus().initialized === true);
+    ok('provider lifecycle initializes exactly once', lifecycle.isInitialized() === true);
     ok('provider lifecycle registers all controlled providers', registry.isRegistered('CRM') && registry.isRegistered('SMS'));
     ok('provider lifecycle initialization executes no provider', crmCalls === 0 && smsCalls === 0);
 
@@ -115,8 +115,8 @@ async function main(): Promise<void> {
     ];
 
     rejects('duplicate normalized provider targets fail before lifecycle mutation', () => lifecycle.initialize(duplicateDefinitions));
-    ok('duplicate provider failure leaves registry untouched', registry.listRegistrations().length === 0);
-    ok('duplicate provider failure leaves lifecycle uninitialized', lifecycle.getStatus().initialized === false);
+    ok('duplicate provider failure leaves registry untouched', registry.list().length === 0);
+    ok('duplicate provider failure leaves lifecycle uninitialized', lifecycle.isInitialized() === false);
   });
 
   console.log('Phase 5C.3B provider lifecycle boundary passed.');
