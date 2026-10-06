@@ -6,8 +6,9 @@ import { IntegrationOrchestratorService } from './integration-orchestrator.servi
 import { IntegrationExecutorService } from './integration-executor.service';
 import { IntegrationPolicyService } from './integration-policy.service';
 import { IntegrationAdapterRegistryService } from './integration-adapter-registry.service';
+import { IntegrationAdapterLifecycleService } from './integration-adapter-lifecycle.service';
 import { PrismaService } from '../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 
-@Module({ imports: [AuthModule], controllers: [IntegrationController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationAdapterRegistryService, PrismaService] })
+@Module({ imports: [AuthModule], controllers: [IntegrationController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
 export class IntegrationModule {}
