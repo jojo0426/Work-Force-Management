@@ -23,6 +23,9 @@ export class IntegrationAdapterRegistryService {
 
   register(target: string, adapter: IntegrationAdapter): IntegrationAdapterRegistration {
     const targetSystem = this.normalizeTarget(target);
+    if (typeof adapter !== 'function') {
+      throw new Error(`Integration adapter for ${targetSystem} must be a function`);
+    }
     if (this.registeredTargets.has(targetSystem)) {
       throw new Error(`Integration adapter already registered for ${targetSystem}`);
     }
@@ -30,6 +33,25 @@ export class IntegrationAdapterRegistryService {
     this.executor.registerAdapter(targetSystem, adapter);
     this.registeredTargets.add(targetSystem);
 
+    return this.describe(targetSystem);
+  }
+
+  isRegistered(target: string): boolean {
+    return this.registeredTargets.has(this.normalizeTarget(target));
+  }
+
+  get(target: string): IntegrationAdapterRegistration | null {
+    const targetSystem = this.normalizeTarget(target);
+    return this.registeredTargets.has(targetSystem) ? this.describe(targetSystem) : null;
+  }
+
+  list(): IntegrationAdapterRegistration[] {
+    return [...this.registeredTargets]
+      .sort()
+      .map((targetSystem) => this.describe(targetSystem));
+  }
+
+  private describe(targetSystem: string): IntegrationAdapterRegistration {
     const currentPolicy = this.policy.getPolicy();
     return {
       targetSystem,
@@ -37,22 +59,6 @@ export class IntegrationAdapterRegistryService {
       policyAllowed: this.policy.isTargetAllowed(targetSystem),
       executionEnabled: currentPolicy.executionEnabled,
     };
-  }
-
-  isRegistered(target: string): boolean {
-    return this.registeredTargets.has(this.normalizeTarget(target));
-  }
-
-  list(): IntegrationAdapterRegistration[] {
-    const currentPolicy = this.policy.getPolicy();
-    return [...this.registeredTargets]
-      .sort()
-      .map((targetSystem) => ({
-        targetSystem,
-        registered: true as const,
-        policyAllowed: this.policy.isTargetAllowed(targetSystem),
-        executionEnabled: currentPolicy.executionEnabled,
-      }));
   }
 
   private normalizeTarget(target: string): string {
