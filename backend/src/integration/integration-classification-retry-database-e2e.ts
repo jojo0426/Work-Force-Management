@@ -82,7 +82,7 @@ async function main() {
     ok('INVALID_RESPONSE consumes one attempt without exhausting maxRetries', invalidRow?.retries === 1 && invalidRow?.maxRetries === 5);
     ok('INVALID_RESPONSE records failedAt', !!invalidRow?.failedAt);
     ok('INVALID_RESPONSE releases ownership', invalidRow?.claimToken === null && invalidRow?.claimedAt === null);
-    ok('INVALID_RESPONSE diagnostic is persisted', String(invalidRow?.lastError || '').includes('Invalid integration adapter response'));
+    ok('INVALID_RESPONSE diagnostic is persisted', String(invalidRow?.lastError || '').includes('returned an invalid response'));
     const invalidAgain = await invalidWorker.runOnce(new Date(invalidNow.getTime() + 60_000), 30_000);
     ok('INVALID_RESPONSE terminal job cannot be reclaimed', invalidAgain.status === 'IDLE');
     ok('INVALID_RESPONSE terminal job cannot execute adapter again', invalidCalls === 1);
