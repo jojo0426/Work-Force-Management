@@ -9,12 +9,13 @@ on:
       - wfm-phase-2-dependency-hardening
       - wfm-phase-3-workorder-dispatch
       - wfm-phase-4-operations
+      - wfm-phase-5c7-classification-retry
   pull_request:
     branches:
       - main
   workflow_dispatch:
 
-# Phase 4 validation covers the authoritative live-operations snapshot and existing regression gates.
+# Phase 5C validation extends the authoritative live-operations baseline with integration execution, retry, classification, and database safety gates.
 
 jobs:
   backend:
@@ -55,6 +56,10 @@ jobs:
       - name: Run database-backed field exception lifecycle E2E
         run: npm run test:field-exception-database-e2e
       - run: npm run test:security
+      - name: Run Phase 5C integration closure selftests
+        run: npm run test:phase5c
+      - name: Run Phase 5C integration database closure suite
+        run: npm run test:phase5c-database
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
