@@ -9,9 +9,10 @@ import { IntegrationFleetControlService } from './integration-fleet-control.serv
 import { IntegrationHealthMetricsService } from './integration-health-metrics.service';
 import { IntegrationAdapterRegistryService } from './integration-adapter-registry.service';
 import { IntegrationAdapterLifecycleService } from './integration-adapter-lifecycle.service';
+import { IntegrationApprovalLedgerService } from './integration-approval-ledger.service';
 import { IntegrationReconciliationService } from './integration-reconciliation.service';
 import { PrismaService } from '../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 
-@Module({ imports: [AuthModule], controllers: [IntegrationController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationFleetControlService, IntegrationReconciliationService, IntegrationHealthMetricsService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
+@Module({ imports: [AuthModule], controllers: [IntegrationController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationFleetControlService, IntegrationReconciliationService, IntegrationApprovalLedgerService, IntegrationHealthMetricsService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
 export class IntegrationModule {}
