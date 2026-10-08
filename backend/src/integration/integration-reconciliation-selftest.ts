@@ -29,6 +29,10 @@ async function main(): Promise<void> {
     user: { findMany: async () => approversEnabled
       ? [{ id: 'operator-1' }, { id: 'reviewer-2' }]
       : [{ id: 'operator-1' }] },
+    integrationApprovalEvent: { findMany: async () => [
+      { action: 'PROPOSE', actorUserId: 'operator-1', sessionIdHash: 'session-hash-a' },
+      { action: 'APPROVE', actorUserId: 'reviewer-2', sessionIdHash: 'session-hash-b' },
+    ] },
     integrationReconciliationAudit: {
       create: async () => { writes += 1; },
     },
