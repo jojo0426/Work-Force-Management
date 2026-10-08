@@ -88,6 +88,26 @@ export class IntegrationService {
     const candidates = await this.prisma.integrationJob.findMany({ where: { status: 'PROCESSING', claimedAt: { lte: staleBefore }, claimToken: { not: null } }, orderBy: [{ claimedAt: 'asc' }, { createdAt: 'asc' }], take: safeTake });
     let recovered = 0; let failed = 0;
     for (const candidate of candidates) {
+      // Never blindly replay a stale claim that may have crossed the
+      // external dispatch boundary. Persist quarantine for reconciliation.
+      const admissions = await this.prisma.integrationAdmission.count({
+        where: { jobId: candidate.id, claimToken: candidate.claimToken },
+      });
+      if (admissions > 0) {
+        const quarantined = await this.prisma.integrationJob.updateMany({
+          where: {
+            id: candidate.id, status: 'PROCESSING',
+            claimToken: candidate.claimToken, claimedAt: candidate.claimedAt,
+          },
+          data: {
+            status: 'RECONCILIATION_REQUIRED',
+            lastError: 'Potential external side effect: manual provider reconciliation required',
+            claimToken: null, claimedAt: null,
+          },
+        });
+        if (quarantined.count === 1) failed += 1;
+        continue;
+      }
       const retries = candidate.retries + 1;
       const exhausted = retries >= candidate.maxRetries;
       const lastError = `Integration worker claim lease expired after ${safeLeaseMs}ms`;
