@@ -28,9 +28,9 @@ async function main(): Promise<void> {
   };
   const svc = new IntegrationApprovalLedgerService(db);
   const operator = { userId: 'operator-1', role: 'SUPERVISOR' as const,
-    sessionId: 'operator-session-token-123456' };
+    sessionHash: 'a'.repeat(64) };
   const reviewer = { userId: 'reviewer-2', role: 'ADMINISTRATOR' as const,
-    sessionId: 'reviewer-session-token-123456' };
+    sessionHash: 'b'.repeat(64) };
   check('review before proposal denied',
     !(await svc.record(reviewer, 'admission-1', 'evidence-1', 'APPROVE')));
   check('operator proposal accepted',
