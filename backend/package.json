@@ -64,7 +64,8 @@
         "test:phase5d-activation": "ts-node src/integration/integration-activation-safety-selftest.ts",
         "test:phase5d-release": "ts-node src/integration/integration-release-acceptance-selftest.ts",
         "test:phase5e-provider": "ts-node src/integration/provider-acceptance-contract-selftest.ts",
-        "test:phase5e-fleet-foundation": "ts-node src/integration/integration-fleet-control-selftest.ts"
+        "test:phase5e-fleet-foundation": "ts-node src/integration/integration-fleet-control-selftest.ts",
+        "test:phase5e-fleet-stop": "ts-node src/integration/integration-fleet-stop-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
