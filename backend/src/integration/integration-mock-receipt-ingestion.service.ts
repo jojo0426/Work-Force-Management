@@ -6,8 +6,6 @@ import { IntegrationMockKeyVerifierService, MockSigningKeyCandidate } from './in
 
 export type MockReceiptIngestion = Readonly<{
   admissionId: string;
-  operatorId: string;
-  reviewerId: string;
   evidenceRef: string;
   receipt: ProviderReceipt;
   signatureHex: string;
@@ -29,8 +27,7 @@ export class IntegrationMockReceiptIngestionService {
     key: MockSigningKeyCandidate,
     nowSeconds: number,
   ): Promise<{ accepted: boolean; evidenceId: string | null }> {
-    if (!input || !input.admissionId || !input.operatorId ||
-        !input.reviewerId || input.operatorId === input.reviewerId ||
+    if (!input || !input.admissionId ||
         !/^[A-Za-z0-9_./:@-]{3,180}$/.test(input.evidenceRef) ||
         !(await this.keys.verify(input.receipt, input.signatureHex, key, nowSeconds))) {
       return { accepted: false, evidenceId: null };
@@ -53,6 +50,8 @@ export class IntegrationMockReceiptIngestionService {
         }
         // Do not trust a caller's claim that this receipt belongs to a job:
         // bind it to a durable attempt key and explicit mock target.
+        // A receipt attests provider outcome, not operator/reviewer identity.
+        // The two approvers must be attributed through authenticated actions.
         const evidenceId = randomUUID();
         await tx.integrationMockReceiptReplay.create({
           data: {
@@ -69,8 +68,9 @@ export class IntegrationMockReceiptIngestionService {
             confirmedOutcome: input.receipt.outcome,
             evidenceRef: input.evidenceRef + '/' +
               createHash('sha256').update(input.signatureHex.toLowerCase()).digest('hex').slice(0, 24),
-            operatorId: input.operatorId, reviewerId: input.reviewerId,
-            validated: true,
+            operatorId: 'PENDING_AUTHENTICATED_PROPOSAL',
+            reviewerId: 'PENDING_AUTHENTICATED_REVIEW',
+            validated: false,
           },
         });
         return { accepted: true, evidenceId };
