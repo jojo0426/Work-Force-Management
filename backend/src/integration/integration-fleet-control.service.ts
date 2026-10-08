@@ -35,6 +35,56 @@ export class IntegrationFleetControlService {
     }
   }
 
+  /**
+   * Read-only, fail-closed shutdown status. A stopped gate is NOT equivalent
+   * to drained: unresolved attempts can outlive a worker or DB connection.
+   */
+  async inspectDrain(): Promise<{
+    stopped: boolean;
+    drained: boolean;
+    generation: bigint | null;
+    unresolved: number | null;
+    reason: 'STOPPED' | 'ENABLED' | 'MISSING' | 'UNAVAILABLE';
+  }> {
+    try {
+      return await this.prisma.$transaction(async tx => {
+        const row = await tx.integrationFleetControl.findUnique({
+          where: { id: 'GLOBAL' }, select: { enabled: true, generation: true },
+        });
+        if (!row) return { stopped: false, drained: false, generation: null, unresolved: null, reason: 'MISSING' as const };
+        const unresolved = await tx.integrationAdmission.count({
+          where: { status: { in: ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] } },
+        });
+        return {
+          stopped: row.enabled === false,
+          drained: row.enabled === false && unresolved === 0,
+          generation: row.generation,
+          unresolved,
+          reason: row.enabled === false ? 'STOPPED' as const : 'ENABLED' as const,
+        };
+      });
+    } catch {
+      return { stopped: false, drained: false, generation: null, unresolved: null, reason: 'UNAVAILABLE' };
+    }
+  }
+
+  /**
+   * Conservative operator-only terminal resolution of a durable attempt.
+   * Caller must independently verify provider outcome and authorization.
+   * No API endpoint is exposed by this service.
+   */
+  async markAdmissionReconciled(admissionId: string): Promise<boolean> {
+    if (!admissionId) return false;
+    const updated = await this.prisma.integrationAdmission.updateMany({
+      where: {
+        id: admissionId,
+        status: { in: ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] },
+      },
+      data: { status: 'RECONCILED', releasedAt: new Date() },
+    });
+    return updated.count === 1;
+  }
+
   /** No remote enable path is provided. Never creates the control row. */
   async stopFleet(actor: string, reasonCode: string): Promise<{ stopped: boolean; generation: bigint | null }> {
     const safeActor = String(actor || '').trim();
