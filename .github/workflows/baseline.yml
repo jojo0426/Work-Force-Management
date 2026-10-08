@@ -67,6 +67,8 @@ jobs:
         run: npm run test:phase5d-sandbox
       - name: Run Phase 5D advanced mock provider faults
         run: npm run test:phase5d-faults
+      - name: Run Phase 5D privacy-safe monitoring baseline
+        run: npm run test:phase5d-monitoring
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
