@@ -108,6 +108,8 @@ jobs:
         run: npm run test:phase5e-mock-receipt-database
       - name: Run Phase 5E authenticated evidence attribution regression
         run: npm run test:phase5e-evidence-attribution
+      - name: Run Phase 5E full synthetic reconciliation PostgreSQL E2E
+        run: npm run test:phase5e-synthetic-reconciliation-database
       - name: Run Phase 5E authenticated approval HTTP fixture
         run: npm run test:phase5e-approval-http
       - name: Run Phase 5E isolated reconciliation database E2E
