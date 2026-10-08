@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { spawn } from 'child_process';
+import { join } from 'path';
 import { IntegrationFleetControlService } from './integration-fleet-control.service';
 import { IntegrationService } from './integration.service';
 
@@ -94,6 +96,34 @@ async function main(): Promise<void> {
     } finally {
       await replicaDb.$disconnect();
     }
+    // Independent Node.js process: kill during a synthetic in-flight callback.
+    // A committed pre-dispatch marker must survive child process termination.
+    const beforeCrash = await db.integrationAdmission.count({ where: { jobId: claim!.id } });
+    const child = spawn(process.execPath, [
+      '-r', 'ts-node/register',
+      join(__dirname, 'integration-fleet-crash-child.ts'),
+      claim!.id, claim!.claimToken!,
+    ], { cwd: process.cwd(), env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let childErrors = '';
+    child.stderr.on('data', chunk => { childErrors += String(chunk); });
+    try {
+      await Promise.race([
+        new Promise<void>((resolve, reject) => {
+          let output = '';
+          child.stdout.on('data', chunk => {
+            output += String(chunk);
+            if (output.includes('SYNTHETIC_CALLBACK_STARTED')) resolve();
+          });
+          child.once('exit', code => reject(new Error('Child exited before callback: ' + code + ' ' + childErrors)));
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Synthetic child start timeout: ' + childErrors)), 12000)),
+      ]);
+    } finally {
+      child.kill('SIGKILL');
+    }
+    await new Promise<void>(resolve => child.once('exit', () => resolve()));
+    const afterCrash = await db.integrationAdmission.count({ where: { jobId: claim!.id } });
+    check('independent worker process crash retains committed attempt marker', afterCrash === beforeCrash + 1);
     const finalStop = await control.stopFleet('ci-operator', 'TEST_STOP');
     check('stop after callback failure succeeds', finalStop.stopped && finalStop.generation === 3n);
     const drainAfterStop = await control.inspectDrain();
