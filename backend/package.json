@@ -77,7 +77,8 @@
         "test:phase5e-approval-ledger": "ts-node src/integration/integration-approval-ledger-selftest.ts",
         "test:phase5e-approval-boundary": "ts-node src/integration/integration-approval-boundary-selftest.ts",
         "test:phase5e-mock-receipt-ingestion": "ts-node src/integration/integration-mock-receipt-ingestion-selftest.ts",
-        "test:phase5e-approval-http": "ts-node src/integration/integration-approval-http-selftest.ts"
+        "test:phase5e-approval-http": "ts-node src/integration/integration-approval-http-selftest.ts",
+        "test:phase5e-mock-key-lifecycle": "ts-node src/integration/integration-mock-key-verifier-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
