@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma.service';
 import {
   ProviderIdempotencyEvidence,
@@ -75,6 +75,18 @@ export class IntegrationReconciliationService {
           // Pending mock evidence is usable only with two immutable
           // independently authenticated attribution events.
           if (trusted.provider !== 'MOCK') return false;
+          // Verify receipt provenance against the immutable replay ledger.
+          // A fabricated pending evidence row without a signed ingestion
+          // record must never be eligible for reconciliation.
+          const replay = await tx.integrationMockReceiptReplay.findUnique({
+            where: { requestId: trusted.providerRequestId },
+          });
+          if (!replay || replay.admissionId !== input.admissionId ||
+              !/^[a-f0-9]{64}$/.test(replay.signature) ||
+              !trusted.evidenceRef.endsWith('/' +
+                createHash('sha256').update(replay.signature).digest('hex').slice(0, 24))) {
+            return false;
+          }
           const attributions = await tx.integrationEvidenceAttribution.findMany({
             where: { evidenceId: input.trustedEvidenceId, admissionId: input.admissionId },
             select: { action: true, actorUserId: true, sessionHash: true },
