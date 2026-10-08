@@ -86,6 +86,8 @@ jobs:
         run: npm run test:phase5e-fleet-wiring
       - name: Run Phase 5E isolated PostgreSQL stop admission race
         run: npm run test:phase5e-fleet-database
+      - name: Run Phase 5E reconciliation quarantine regression
+        run: npm run test:phase5e-reconciliation
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
