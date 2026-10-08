@@ -9,8 +9,8 @@ export type ProviderAcceptanceProfile = Readonly<{
   idempotency: 'jobId';
   requestAction: 'PING';
   responseStatus: 'SUCCESS';
-  transientCodes: readonly ['RATE_LIMIT', 'UNAVAILABLE'];
-  permanentCodes: readonly ['UNAUTHORIZED', 'INVALID_REQUEST'];
+  transientCodes: readonly string[];
+  permanentCodes: readonly string[];
 }>;
 
 export const MOCK_PROVIDER_ACCEPTANCE: ProviderAcceptanceProfile = Object.freeze({
