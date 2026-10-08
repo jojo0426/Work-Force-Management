@@ -62,7 +62,8 @@
         "test:phase5d-monitoring": "ts-node src/integration/integration-health-metrics-selftest.ts",
         "test:phase5d-monitoring-wiring": "ts-node src/integration/integration-health-wiring-selftest.ts",
         "test:phase5d-activation": "ts-node src/integration/integration-activation-safety-selftest.ts",
-        "test:phase5d-release": "ts-node src/integration/integration-release-acceptance-selftest.ts"
+        "test:phase5d-release": "ts-node src/integration/integration-release-acceptance-selftest.ts",
+        "test:phase5e-provider": "ts-node src/integration/provider-acceptance-contract-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
