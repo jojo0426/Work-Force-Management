@@ -444,3 +444,17 @@ model IntegrationApprovalEvent {
   @@unique([admissionId, actorUserId, action])
   @@index([admissionId, action])
 }
+
+
+// Phase 5E.2U: durable replay ledger for synthetic signed receipts.
+model IntegrationMockReceiptReplay {
+  id          String   @id @default(uuid())
+  requestId   String
+  issuedAt    Int
+  signature   String
+  admissionId String
+  recordedAt  DateTime @default(now())
+
+  @@unique([requestId, issuedAt, signature])
+  @@index([admissionId])
+}
