@@ -7,7 +7,7 @@
 - Phase 5D.2B mock advanced fault validation: #298 — successful.
 - Phase 5D.3B monitoring execution integration: #307 — successful.
 - Phase 5D.4 emergency stop and activation baseline: #312 — successful.
-- Phase 5D.5 final CI: **PENDING**. Record the final run URL, commit SHA, individual job conclusions and audit results after execution.
+- Phase 5D.5 final CI: **SUCCESS** — [GitHub Actions #316](https://github.com/jojo0426/Work-Force-Management/actions/runs/37722072783), commit `f71fe37d452eb8d480afbf46d27955ee13c9b9b1`. Backend build/security, web build/auth, and mobile TypeScript jobs all succeeded. This is CI evidence only, not sandbox or production approval.
 - Backend PostgreSQL E2E, Phase 5C database recovery/concurrency tests, backend security/build, web auth/build, mobile TypeScript, and backend/web production dependency audits remain mandatory CI gates.
 - **Mobile dependency audit is non-blocking** in the baseline workflow and must not be reported as clean or as a release-blocking security gate.
 
@@ -30,7 +30,7 @@
 - Security review: **PENDING**
 - Operator approval: **PENDING**
 - Rollback drill approval: **PENDING**
-- Final CI run: **PENDING**
+- Final CI run: **PASS — #316** (previous checkpoint; documentation-only changes require subsequent PR checks)
 - Merge to main: **NOT APPROVED**
 - Production integration execution: **DISABLED / NOT APPROVED**
 
