@@ -129,12 +129,16 @@ async function main(): Promise<void> {
     check('stop after callback failure succeeds', finalStop.stopped && finalStop.generation === 3n);
     const drainAfterStop = await control.inspectDrain();
     check('stopped fleet with uncertain attempt cannot claim drained', drainAfterStop.stopped && !drainAfterStop.drained && drainAfterStop.unresolved !== null && drainAfterStop.unresolved > 0);
+    const protocol = await control.stopAndInspect('ci-operator', 'TEST_STOP');
+    check('stop reports admissions closed, not external drain',
+      protocol.acknowledged && !protocol.externallyDrained &&
+      protocol.unresolvedAttempts !== null && protocol.unresolvedAttempts > 0);
     const after = await control.reserveAdmission(claim!.id, claim!.claimToken!);
     check('post-stop admission is blocked', !after.admitted);
     const row = await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } });
-    check('stop persisted disabled and advanced generation', row?.enabled === false && row.generation === 3n);
+    check('stop persisted disabled and advanced generation', row?.enabled === false && row.generation === 4n);
     const admissions = await db.integrationAdmission.findMany({ where: { jobId: claim!.id } });
-    check('no admission can have stopped generation', admissions.every(x => x.generation < 3n));
+    check('no admission can have stopped generation', admissions.every(x => x.generation < 4n));
     check('at most one synthetic admission', admissions.length <= 4);
     console.log('PASS: database held-lock synthetic dispatch ordering verified; provider crash and ambiguous side effects NOT proven.');
   } finally {
