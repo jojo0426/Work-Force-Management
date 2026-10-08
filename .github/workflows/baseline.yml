@@ -88,6 +88,8 @@ jobs:
         run: npm run test:phase5e-fleet-database
       - name: Run Phase 5E reconciliation quarantine regression
         run: npm run test:phase5e-reconciliation
+      - name: Run Phase 5E drain status regression
+        run: npm run test:phase5e-drain
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
