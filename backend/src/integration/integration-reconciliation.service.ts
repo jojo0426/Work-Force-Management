@@ -71,6 +71,19 @@ export class IntegrationReconciliationService {
             trusted.reviewerId !== input.reviewerId ||
             trusted.operatorId === trusted.reviewerId ||
             trusted.validated !== true) return false;
+        // Resolve operator identities from current database users rather than
+        // trusting caller-declared roles. This is not session authentication.
+        const approvers = await tx.user.findMany({
+          where: {
+            id: { in: [input.operatorId, input.reviewerId] },
+            isActive: true,
+            role: { in: ['SUPERVISOR', 'ADMINISTRATOR'] },
+          },
+          select: { id: true },
+        });
+        if (approvers.length !== 2 ||
+            !approvers.some(user => user.id === input.operatorId) ||
+            !approvers.some(user => user.id === input.reviewerId)) return false;
         await tx.integrationReconciliationAudit.create({
           data: {
             id: randomUUID(), admissionId: input.admissionId,
