@@ -88,6 +88,8 @@ jobs:
         run: npm run test:phase5e-fleet-database
       - name: Run Phase 5E.2AB two-replica stop contract
         run: npm run test:phase5e-fleet-stop-contract-database
+      - name: Run Phase 5E.2AC dispatch fencing adversarial contract
+        run: npm run test:phase5e-dispatch-fence-contract
       - name: Run Phase 5E reconciliation quarantine regression
         run: npm run test:phase5e-reconciliation
       - name: Run Phase 5E drain status regression
