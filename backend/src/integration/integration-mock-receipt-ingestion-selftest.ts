@@ -1,4 +1,5 @@
 import { createHmac } from 'crypto';
+import { verifyMockProviderReceipt } from './provider-receipt-authenticity';
 import { IntegrationMockReceiptIngestionService } from './integration-mock-receipt-ingestion.service';
 
 function check(name: string, ok: boolean): void {
@@ -34,7 +35,11 @@ async function main(): Promise<void> {
     },
     integrationProviderEvidence: { create: async () => { writes += 1; } },
   };
-  const service = new IntegrationMockReceiptIngestionService(prisma);
+  const service = new IntegrationMockReceiptIngestionService(prisma, {
+    verify: async (r: any, sig: string, key: any, at: number) =>
+      key.id === 'synthetic-key-v1' &&
+      verifyMockProviderReceipt(r, sig, key.secret, at),
+  } as any);
   const input = {
     admissionId: 'admission-1', operatorId: 'operator-1',
     reviewerId: 'reviewer-2', evidenceRef: 'synthetic/receipt-1',
@@ -42,10 +47,10 @@ async function main(): Promise<void> {
   };
   check('invalid signature rejected', !(await service.ingest({
     ...input, signatureHex: '0'.repeat(64),
-  }, secret, now)).accepted && writes === 0);
+  }, { id: 'synthetic-key-v1', secret }, now)).accepted && writes === 0);
   mismatch = true;
   check('wrong request binding rejected',
-    !(await service.ingest(input, secret, now)).accepted && writes === 0);
+    !(await service.ingest(input, { id: 'synthetic-key-v1', secret }, now)).accepted && writes === 0);
   mismatch = false;
   check('valid mock receipt persisted',
     (await service.ingest(input, secret, now)).accepted && writes === 2);
