@@ -1,5 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { IntegrationService } from './integration.service';
+import { IntegrationFleetControlService } from './integration-fleet-control.service';
 import { IntegrationExecutionError, IntegrationExecutorService } from './integration-executor.service';
 
 export type IntegrationWorkerHandlerResult = { externalActionsExecuted?: boolean };
@@ -15,6 +16,7 @@ export class IntegrationWorkerService {
   constructor(
     private readonly integration: IntegrationService,
     @Optional() private readonly executor?: IntegrationExecutorService,
+    @Optional() private readonly fleet?: IntegrationFleetControlService,
   ) {}
 
   registerHandler(target: string, handler: IntegrationWorkerHandler): void {
@@ -35,10 +37,17 @@ export class IntegrationWorkerService {
   }
 
   async runOnce(now = new Date(), retryDelayMs = 30_000) {
+    if (this.fleet && !(await this.fleet.inspectGate()).allowed) {
+      return { status: 'IDLE' as const, job: null, externalActionsExecuted: false };
+    }
     const job = await this.integration.claimNextJob(now);
     if (!job) return { status: 'IDLE' as const, job: null, externalActionsExecuted: false };
     const claimToken = job.claimToken;
     if (!claimToken) throw new Error('Claimed integration job is missing ownership token');
+    if (this.fleet && !(await this.fleet.inspectGate()).allowed) {
+      const paused = await this.integration.pauseClaimedJob(job.id, claimToken);
+      return { status: 'IDLE' as const, job: paused, externalActionsExecuted: false };
+    }
     const target = String(job.targetSystem || '').trim().toUpperCase();
     const handler = this.handlers.get(target);
 
