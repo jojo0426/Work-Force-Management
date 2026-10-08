@@ -58,6 +58,14 @@ function main(): void {
   expectRejected('malformed enable flag rejected', { INTEGRATION_EXECUTION_ENABLED: 'sensitive-example-token' }, 'must be true or false');
   expectRejected('invalid timeout rejected', { INTEGRATION_EXECUTION_TIMEOUT_MS: '0' }, 'positive safe integer');
   expectRejected('invalid retry rejected', { INTEGRATION_RETRY_DELAY_MS: '-1' }, 'positive integer');
+  expectRejected('excessive timeout rejected', { INTEGRATION_EXECUTION_TIMEOUT_MS: '300001' }, 'exceeds the allowed maximum');
+  expectRejected('excessive retry delay rejected', { INTEGRATION_RETRY_DELAY_MS: '86400001' }, 'exceeds the allowed maximum');
+  expectRejected('invalid target rejected without reflecting its value', { INTEGRATION_ALLOWED_TARGETS: 'sensitive-example-token!' }, 'Invalid integration target');
+  withPolicyEnv({ INTEGRATION_EXECUTION_TIMEOUT_MS: '300000', INTEGRATION_RETRY_DELAY_MS: '86400000' }, () => {
+    const policy = new IntegrationPolicyService().getPolicy();
+    assert('maximum timeout accepted', policy.executionTimeoutMs === 300000);
+    assert('maximum retry delay accepted', policy.retryDelayMs === 86400000);
+  });
   console.log('Phase 5D.1 configuration preflight baseline passed.');
 }
 
