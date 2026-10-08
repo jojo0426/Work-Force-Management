@@ -69,20 +69,11 @@ export class IntegrationFleetControlService {
   }
 
   /**
-   * Conservative operator-only terminal resolution of a durable attempt.
-   * Caller must independently verify provider outcome and authorization.
-   * No API endpoint is exposed by this service.
+   * Legacy unaudited resolution is prohibited. Use the evidence-gated
+   * reconciliation service with independent reviewer and durable audit.
    */
-  async markAdmissionReconciled(admissionId: string): Promise<boolean> {
-    if (!admissionId) return false;
-    const updated = await this.prisma.integrationAdmission.updateMany({
-      where: {
-        id: admissionId,
-        status: { in: ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] },
-      },
-      data: { status: 'RECONCILED', releasedAt: new Date() },
-    });
-    return updated.count === 1;
+  async markAdmissionReconciled(_admissionId: string): Promise<boolean> {
+    return false;
   }
 
   /**
