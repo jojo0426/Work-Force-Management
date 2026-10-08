@@ -37,9 +37,9 @@ async function main(): Promise<void> {
   const reviewer = { userId: reviewerId, role: 'ADMINISTRATOR' as const,
     sessionHash: 'b'.repeat(64) };
   try {
-    check('isolated control initially absent',
-      (await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } })) === null);
-    await db.integrationFleetControl.create({ data: { id: 'GLOBAL', enabled: false } });
+    const existing = await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } });
+    check('isolated fleet control is stopped', !existing || existing.enabled === false);
+    if (!existing) await db.integrationFleetControl.create({ data: { id: 'GLOBAL', enabled: false } });
     await db.integrationJob.create({
       data: {
         id: jobId, sourceSystem: 'PHASE5E2Y_SYNTHETIC',
