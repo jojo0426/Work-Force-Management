@@ -428,3 +428,19 @@ model IntegrationProviderEvidence {
   validated         Boolean  @default(false)
   recordedAt        DateTime @default(now())
 }
+
+
+// Phase 5E.2S: append-only session-bound approval intentions.
+// A proposal and independent approval must be recorded separately.
+model IntegrationApprovalEvent {
+  id            String   @id @default(uuid())
+  admissionId   String
+  actorUserId   String
+  action        String
+  evidenceId    String
+  sessionIdHash String
+  recordedAt    DateTime @default(now())
+
+  @@unique([admissionId, actorUserId, action])
+  @@index([admissionId, action])
+}
