@@ -54,7 +54,11 @@ export class IntegrationApprovalLedgerService {
           if (evidence.validated && evidence.reviewerId !== actor.userId) return false;
           const proposal = await tx.integrationApprovalEvent.findFirst({
             where: { admissionId, evidenceId, action: 'PROPOSE',
-              actorUserId: evidence.validated ? evidence.operatorId : undefined },
+              actorUserId: evidence.validated ? evidence.operatorId :
+                (await tx.integrationEvidenceAttribution.findFirst({
+                  where: { evidenceId, action: 'ATTEST' },
+                  select: { actorUserId: true },
+                }))?.actorUserId },
           });
           if (!proposal || proposal.actorUserId === actor.userId) return false;
         }
