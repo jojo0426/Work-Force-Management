@@ -35,14 +35,39 @@ async function main(): Promise<void> {
     ]);
     check('concurrent stop acknowledged', stop.stopped && stop.generation === 1n);
     check('reservation either committed before stop or was rejected', typeof reserve.admitted === 'boolean');
+    // Re-enable ONLY inside this isolated CI fixture for the held-lock dispatch race.
+    await db.integrationFleetControl.update({ where: { id: 'GLOBAL' }, data: { enabled: true } });
+    let entered!: () => void;
+    let release!: () => void;
+    const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+    const releasePromise = new Promise<void>(resolve => { release = resolve; });
+    const dispatched = control.withFencedDispatch(claim!.id, claim!.claimToken!, async () => {
+      entered();
+      await releasePromise;
+      return 'SYNTHETIC_ONLY';
+    });
+    await enteredPromise;
+    let stopAcknowledged = false;
+    const stopDuringDispatch = control.stopFleet('ci-operator', 'TEST_STOP').then(value => {
+      stopAcknowledged = true;
+      return value;
+    });
+    // Yield to the stop transaction while the callback retains the row lock.
+    await new Promise(resolve => setTimeout(resolve, 150));
+    check('stop not acknowledged while dispatch callback holds fence', !stopAcknowledged);
+    release();
+    const fenced = await dispatched;
+    const stoppedAfter = await stopDuringDispatch;
+    check('synthetic dispatch completes before stop acknowledgement', fenced.admitted && fenced.result === 'SYNTHETIC_ONLY' && stoppedAfter.stopped);
+    check('second stop advances generation', stoppedAfter.generation === 2n);
     const after = await control.reserveAdmission(claim!.id, claim!.claimToken!);
     check('post-stop admission is blocked', !after.admitted);
     const row = await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } });
-    check('stop persisted disabled and advanced generation', row?.enabled === false && row.generation === 1n);
+    check('stop persisted disabled and advanced generation', row?.enabled === false && row.generation === 2n);
     const admissions = await db.integrationAdmission.findMany({ where: { jobId: claim!.id } });
-    check('no admission can have stopped generation', admissions.every(x => x.generation === 0n));
-    check('at most one synthetic admission', admissions.length <= 1);
-    console.log('PASS: database reservation/stop ordering only. Provider request-start fencing NOT proven.');
+    check('no admission can have stopped generation', admissions.every(x => x.generation < 2n));
+    check('at most one synthetic admission', admissions.length <= 2);
+    console.log('PASS: database held-lock synthetic dispatch ordering verified; provider crash and ambiguous side effects NOT proven.');
   } finally {
     await db.integrationAdmission.deleteMany({ where: { jobId: job.job.id } });
     await db.integrationJob.deleteMany({ where: { sourceSystem: tag } });
