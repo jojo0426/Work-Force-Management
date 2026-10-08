@@ -11,6 +11,7 @@ on:
       - wfm-phase-4-operations
       - wfm-phase-5c7-classification-retry
       - wfm-phase-5d-operational-readiness
+      - wfm-phase-5e-sandbox-acceptance
   pull_request:
     branches:
       - main
@@ -75,6 +76,8 @@ jobs:
         run: npm run test:phase5d-activation
       - name: Run Phase 5D final release acceptance preflight
         run: npm run test:phase5d-release
+      - name: Run Phase 5E mock provider acceptance
+        run: npm run test:phase5e-provider
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
