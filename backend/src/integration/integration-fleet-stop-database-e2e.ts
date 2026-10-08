@@ -60,13 +60,29 @@ async function main(): Promise<void> {
     const stoppedAfter = await stopDuringDispatch;
     check('synthetic dispatch completes before stop acknowledgement', fenced.admitted && fenced.result === 'SYNTHETIC_ONLY' && stoppedAfter.stopped);
     check('second stop advances generation', stoppedAfter.generation === 2n);
+    // A callback failure must not erase the already committed marker.
+    await db.integrationFleetControl.update({ where: { id: 'GLOBAL' }, data: { enabled: true } });
+    const beforeFailure = await db.integrationAdmission.count({ where: { jobId: claim!.id } });
+    let syntheticFailureCaught = false;
+    try {
+      await control.withFencedDispatch(claim!.id, claim!.claimToken!, async () => {
+        throw new Error('synthetic provider outcome unknown');
+      });
+    } catch {
+      syntheticFailureCaught = true;
+    }
+    check('synthetic callback failure is observable', syntheticFailureCaught);
+    const afterFailure = await db.integrationAdmission.count({ where: { jobId: claim!.id } });
+    check('callback rollback does not erase committed dispatch marker', afterFailure === beforeFailure + 1);
+    const finalStop = await control.stopFleet('ci-operator', 'TEST_STOP');
+    check('stop after callback failure succeeds', finalStop.stopped && finalStop.generation === 3n);
     const after = await control.reserveAdmission(claim!.id, claim!.claimToken!);
     check('post-stop admission is blocked', !after.admitted);
     const row = await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } });
-    check('stop persisted disabled and advanced generation', row?.enabled === false && row.generation === 2n);
+    check('stop persisted disabled and advanced generation', row?.enabled === false && row.generation === 3n);
     const admissions = await db.integrationAdmission.findMany({ where: { jobId: claim!.id } });
-    check('no admission can have stopped generation', admissions.every(x => x.generation < 2n));
-    check('at most one synthetic admission', admissions.length <= 2);
+    check('no admission can have stopped generation', admissions.every(x => x.generation < 3n));
+    check('at most one synthetic admission', admissions.length <= 3);
     console.log('PASS: database held-lock synthetic dispatch ordering verified; provider crash and ambiguous side effects NOT proven.');
   } finally {
     await db.integrationAdmission.deleteMany({ where: { jobId: job.job.id } });
