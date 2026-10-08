@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     // The registry is immutable: use the actual synthetic user IDs from the outset.
     const service = new IntegrationReconciliationService(db as any);
     const request = {
-      admissionId, operatorId: 'synthetic-operator', reviewerId: 'synthetic-reviewer',
+      admissionId, operatorId: 'synthetic-operator-' + stamp, reviewerId: 'synthetic-reviewer-' + stamp,
       provider: 'MOCK', providerRequestId: 'synthetic-request-1',
       outcome: 'CONFIRMED_NOT_APPLIED' as const, evidenceRef: 'synthetic/evidence-1',
       trustedEvidenceId: evidenceId, reasonCode: 'SYNTHETIC_VERIFIED',
