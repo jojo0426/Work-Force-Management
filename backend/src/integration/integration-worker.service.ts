@@ -60,6 +60,7 @@ export class IntegrationWorkerService {
       const handlerResult = await handler(job.payload, job);
       const externalActionsExecuted = typeof handlerResult === 'object' && handlerResult !== null && handlerResult.externalActionsExecuted === true;
       const completed = await this.integration.completeClaimedJob(job.id, claimToken, now);
+      if (this.fleet) await this.fleet.settleCompletedClaim(job.id, claimToken);
       return { status: 'COMPLETED' as const, job: completed, externalActionsExecuted };
     } catch (error) {
       const retryable = error instanceof IntegrationExecutionError ? error.retryable : true;
