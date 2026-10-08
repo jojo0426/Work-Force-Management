@@ -1,6 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { IntegrationHealthMetricsService } from './integration-health-metrics.service';
 import { IntegrationPolicyService } from './integration-policy.service';
+import { IntegrationFleetControlService } from './integration-fleet-control.service';
 
 export type IntegrationExecutionContext = {
   jobId: string;
@@ -40,7 +41,7 @@ export class IntegrationExecutionError extends Error {
 export type IntegrationExecutionResult = {
   status: 'EXECUTED' | 'BLOCKED';
   targetSystem: string;
-  reason: 'EXECUTION_DISABLED' | 'TARGET_NOT_ALLOWED' | null;
+  reason: 'EXECUTION_DISABLED' | 'TARGET_NOT_ALLOWED' | 'FLEET_STOPPED' | null;
   externalActionsExecuted: boolean;
 };
 
@@ -51,7 +52,7 @@ export class IntegrationExecutorService {
   private executionEnabled = false;
   private executionTimeoutMs: number | null = null;
 
-  constructor(private readonly policyService?: IntegrationPolicyService, @Optional() private readonly healthMetrics?: IntegrationHealthMetricsService) {}
+  constructor(private readonly policyService?: IntegrationPolicyService, @Optional() private readonly healthMetrics?: IntegrationHealthMetricsService, @Optional() private readonly fleet?: IntegrationFleetControlService) {}
 
   registerAdapter(target: string, adapter: IntegrationAdapter): void {
     const normalizedTarget = this.normalizeTarget(target);
@@ -107,6 +108,12 @@ export class IntegrationExecutorService {
         reason: 'TARGET_NOT_ALLOWED',
         externalActionsExecuted: false,
       };
+    }
+
+    // Shared snapshot is an additional fail-closed guard, NOT a race-free dispatch fence.
+    if (this.fleet && !(await this.fleet.inspectGate()).allowed) {
+      this.healthMetrics?.record('BLOCKED');
+      return { status: 'BLOCKED', targetSystem, reason: 'FLEET_STOPPED', externalActionsExecuted: false };
     }
 
     const adapter = this.adapters.get(targetSystem);
