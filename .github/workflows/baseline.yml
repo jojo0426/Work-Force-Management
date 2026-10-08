@@ -84,6 +84,8 @@ jobs:
         run: npm run test:phase5e-fleet-stop
       - name: Run Phase 5E shared fleet wiring selftest
         run: npm run test:phase5e-fleet-wiring
+      - name: Run Phase 5E isolated PostgreSQL stop admission race
+        run: npm run test:phase5e-fleet-database
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
