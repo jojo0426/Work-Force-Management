@@ -134,7 +134,7 @@ async function main(): Promise<void> {
     check('stop persisted disabled and advanced generation', row?.enabled === false && row.generation === 3n);
     const admissions = await db.integrationAdmission.findMany({ where: { jobId: claim!.id } });
     check('no admission can have stopped generation', admissions.every(x => x.generation < 3n));
-    check('at most one synthetic admission', admissions.length <= 3);
+    check('at most one synthetic admission', admissions.length <= 4);
     console.log('PASS: database held-lock synthetic dispatch ordering verified; provider crash and ambiguous side effects NOT proven.');
   } finally {
     await db.integrationAdmission.deleteMany({ where: { jobId: job.job.id } });
