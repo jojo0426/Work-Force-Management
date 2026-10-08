@@ -70,7 +70,8 @@
         "test:phase5e-fleet-database": "ts-node src/integration/integration-fleet-stop-database-e2e.ts",
         "test:phase5e-reconciliation": "ts-node src/integration/integration-reconciliation-quarantine-selftest.ts",
         "test:phase5e-drain": "ts-node src/integration/integration-drain-status-selftest.ts",
-        "test:phase5e-stop-safety": "ts-node src/integration/integration-stop-safety-selftest.ts"
+        "test:phase5e-stop-safety": "ts-node src/integration/integration-stop-safety-selftest.ts",
+        "test:phase5e-shutdown-drain": "ts-node src/integration/integration-shutdown-drain-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
