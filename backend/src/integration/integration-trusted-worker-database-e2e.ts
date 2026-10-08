@@ -55,6 +55,15 @@ async function main(): Promise<void> {
     const restarted = new IntegrationTrustedWorkerService(b as any);
     check('new service instance cannot seize registered identity',
       !(await restarted.register(workerId, secret, stop.generation!)));
+    check('retirement permitted only with stopped fleet and no unresolved admissions',
+      await trustedB.retire(secondId, 'ci_controller'));
+    check('retired worker cannot register',
+      !(await trustedA.register(secondId, secret + '-2', stop.generation!)));
+    check('repeat retirement denied',
+      !(await trustedB.retire(secondId, 'ci_controller')));
+    const postRetirement = await trustedA.inspect();
+    check('retirement never upgrades provider quiescence',
+      postRetirement.externallyQuiescent === false);
     console.log('Phase 5E.2AF trusted membership PostgreSQL E2E passed.');
   } finally {
     await Promise.all([a.$disconnect(), b.$disconnect()]);
