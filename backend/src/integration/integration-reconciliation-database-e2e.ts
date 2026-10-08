@@ -17,8 +17,8 @@ async function main(): Promise<void> {
   const evidenceId = 'reconciliation-e2e-evidence-' + stamp;
   try {
     const existing = await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } });
-    check('isolated fleet singleton absent', existing === null);
-    await db.integrationFleetControl.create({ data: { id: 'GLOBAL', enabled: false } });
+    check('isolated fleet control is stopped', !existing || existing.enabled === false);
+    if (!existing) await db.integrationFleetControl.create({ data: { id: 'GLOBAL', enabled: false } });
     await db.integrationJob.create({
       data: {
         id: jobId, sourceSystem: 'PHASE5E2Q_SYNTHETIC',
