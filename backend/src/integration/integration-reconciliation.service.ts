@@ -84,6 +84,22 @@ export class IntegrationReconciliationService {
         if (approvers.length !== 2 ||
             !approvers.some(user => user.id === input.operatorId) ||
             !approvers.some(user => user.id === input.reviewerId)) return false;
+        const approvals = await tx.integrationApprovalEvent.findMany({
+          where: {
+            admissionId: input.admissionId,
+            evidenceId: input.trustedEvidenceId,
+            OR: [
+              { action: 'PROPOSE', actorUserId: input.operatorId },
+              { action: 'APPROVE', actorUserId: input.reviewerId },
+            ],
+          },
+          select: { action: true, actorUserId: true, sessionIdHash: true },
+        });
+        const proposal = approvals.find(event =>
+          event.action === 'PROPOSE' && event.actorUserId === input.operatorId);
+        const approval = approvals.find(event =>
+          event.action === 'APPROVE' && event.actorUserId === input.reviewerId);
+        if (!proposal || !approval || proposal.sessionIdHash === approval.sessionIdHash) return false;
         await tx.integrationReconciliationAudit.create({
           data: {
             id: randomUUID(), admissionId: input.admissionId,
