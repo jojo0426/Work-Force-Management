@@ -394,3 +394,23 @@ model IntegrationAdmission {
   @@index([status, generation])
 }
 
+
+/**
+ * Phase 5E.2P: append-only evidence-backed operator resolution record.
+ * No public write endpoint; database grants/trigger protect updates/deletes.
+ */
+model IntegrationReconciliationAudit {
+  id               String   @id @default(uuid())
+  admissionId      String   @unique
+  jobId            String
+  provider         String
+  providerRequestId String
+  outcome          String
+  evidenceRef      String
+  operatorId       String
+  reviewerId       String
+  reasonCode       String
+  recordedAt       DateTime @default(now())
+
+  @@index([jobId, recordedAt])
+}
