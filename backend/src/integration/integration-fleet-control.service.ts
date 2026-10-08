@@ -161,6 +161,39 @@ export class IntegrationFleetControlService {
     };
   }
 
+  /**
+   * Operator stop protocol: close admissions and return the conservative
+   * unresolved ledger count. Does not wait for or cancel provider traffic.
+   */
+  async stopAndInspect(actor: string, reasonCode: string): Promise<{
+    acknowledged: boolean;
+    generation: bigint | null;
+    unresolvedAttempts: number | null;
+    externallyDrained: false;
+  }> {
+    const stop = await this.stopFleet(actor, reasonCode);
+    if (!stop.stopped) return {
+      acknowledged: false, generation: null,
+      unresolvedAttempts: null, externallyDrained: false,
+    };
+    const status = await this.inspectStopSafety();
+    return {
+      acknowledged: status.admissionsClosed,
+      generation: stop.generation,
+      unresolvedAttempts: status.unresolvedAttempts,
+      externallyDrained: false,
+    };
+  }
+
+  /**
+   * Short-transaction dispatch-start barrier: mark an owned attempt as
+   * IN_FLIGHT under the same fleet lock as stop. Once committed, a request
+   * may still start later; stop must treat this attempt as unresolved.
+   */
+  async authorizeDispatchStart(admissionId: string, jobId: string, claimToken: string): Promise<boolean> {
+    return this.markAttemptInFlight(admissionId, jobId, claimToken);
+  }
+
   /** No remote enable path is provided. Never creates the control row. */
   async stopFleet(actor: string, reasonCode: string): Promise<{ stopped: boolean; generation: bigint | null }> {
     const safeActor = String(actor || '').trim();
@@ -225,7 +258,7 @@ export class IntegrationFleetControlService {
     // A second short transaction rechecks stop/generation and records the
     // in-flight boundary. A stop after this commit can acknowledge while
     // the callback remains active; unresolved ledger entries remain visible.
-    const started = await this.markAttemptInFlight(admissionId, jobId, claimToken);
+    const started = await this.authorizeDispatchStart(admissionId, jobId, claimToken);
     if (!started) return { admitted: false };
 
     try {
