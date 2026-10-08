@@ -54,13 +54,14 @@ async function main(): Promise<void> {
       stopAcknowledged = true;
       return value;
     });
-    // Yield to the stop transaction while the callback retains the row lock.
-    await new Promise(resolve => setTimeout(resolve, 150));
-    check('stop not acknowledged while dispatch callback holds fence', !stopAcknowledged);
+    // Stop must not wait for an already-started synthetic callback.
+    const stoppedAfter = await stopDuringDispatch;
+    check('stop can acknowledge while prior callback remains in flight', stoppedAfter.stopped && stopAcknowledged);
+    const whileActive = await control.inspectDrain();
+    check('stop acknowledgement does not falsely report external drain', whileActive.stopped && !whileActive.drained && (whileActive.unresolved || 0) > 0);
     release();
     const fenced = await dispatched;
-    const stoppedAfter = await stopDuringDispatch;
-    check('synthetic dispatch completes before stop acknowledgement', fenced.admitted && fenced.result === 'SYNTHETIC_ONLY' && stoppedAfter.stopped);
+    check('already-started callback may finish after stop', fenced.admitted && fenced.result === 'SYNTHETIC_ONLY');
     check('second stop advances generation', stoppedAfter.generation === 2n);
     // A callback failure must not erase the already committed marker.
     await db.integrationFleetControl.update({ where: { id: 'GLOBAL' }, data: { enabled: true } });
