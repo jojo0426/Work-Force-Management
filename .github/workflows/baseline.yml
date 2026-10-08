@@ -100,6 +100,8 @@ jobs:
         run: npm run test:phase5e-approval-ledger
       - name: Run Phase 5E authenticated approval boundary regression
         run: npm run test:phase5e-approval-boundary
+      - name: Run Phase 5E mock receipt ingestion regression
+        run: npm run test:phase5e-mock-receipt-ingestion
       - name: Run Phase 5E isolated reconciliation database E2E
         run: npm run test:phase5e-reconciliation-database
       - run: npm run build
