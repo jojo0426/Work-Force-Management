@@ -73,6 +73,38 @@ export class IntegrationTrustedWorkerService {
     } catch { return false; }
   }
 
+  /**
+   * Retire only after fleet stop and a clean durable admission ledger.
+   * Retirement never deletes historical membership or claims external drain.
+   * A separate operator approval workflow is still required before production.
+   */
+  async retire(workerId: string, approvedBy: string): Promise<boolean> {
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) ||
+        !/^[A-Za-z0-9_-]{1,80}$/.test(approvedBy)) return false;
+    try {
+      return await this.prisma.$transaction(async tx => {
+        const rows = await tx.$queryRaw<Array<{ enabled: boolean }>>`
+          SELECT "enabled" FROM "IntegrationFleetControl"
+          WHERE "id" = 'GLOBAL' FOR UPDATE
+        `;
+        if (rows.length !== 1 || rows[0].enabled) return false;
+        const unresolved = await tx.integrationAdmission.count({
+          where: { status: { in: ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] } },
+        });
+        if (unresolved !== 0) return false;
+        const membership = await tx.integrationWorkerMembership.findUnique({
+          where: { workerId }, select: { activeAttempts: true },
+        });
+        if (membership && membership.activeAttempts !== 0) return false;
+        const updated = await tx.integrationExpectedWorker.updateMany({
+          where: { workerId, retiredAt: null },
+          data: { retiredAt: new Date() },
+        });
+        return updated.count === 1;
+      });
+    } catch { return false; }
+  }
+
   /** Derive expected workers from the database, never a caller-provided subset. */
   async inspect(): Promise<{
     admissionsClosed: boolean; allAcknowledged: boolean;
