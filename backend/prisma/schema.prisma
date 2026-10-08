@@ -381,6 +381,20 @@ model IntegrationFleetControl {
   updatedAt  DateTime @updatedAt
 }
 
+// Phase 5E.2AE: durable expected membership and generation-bound stop acknowledgments.
+// These records are advisory safety evidence, never proof of provider quiescence.
+model IntegrationWorkerMembership {
+  workerId       String   @id
+  instanceToken  String
+  generation     BigInt
+  registeredAt   DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+  stopAckGeneration BigInt?
+  stopAckAt      DateTime?
+  activeAttempts Int      @default(0)
+  @@index([generation, stopAckGeneration])
+}
+
 model IntegrationAdmission {
   id          String    @id @default(uuid())
   jobId       String
