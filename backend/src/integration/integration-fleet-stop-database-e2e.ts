@@ -74,6 +74,26 @@ async function main(): Promise<void> {
     check('synthetic callback failure is observable', syntheticFailureCaught);
     const afterFailure = await db.integrationAdmission.count({ where: { jobId: claim!.id } });
     check('callback rollback does not erase committed dispatch marker', afterFailure === beforeFailure + 1);
+    // Two independent Prisma connections simulate distinct backend replicas.
+    const replicaDb = new PrismaClient();
+    try {
+      const replica = new IntegrationFleetControlService(replicaDb as any);
+      const unresolvedBeforeStop = await replica.inspectDrain();
+      check('second replica observes unresolved durable attempts', unresolvedBeforeStop.unresolved !== null && unresolvedBeforeStop.unresolved > 0);
+      const marker = await replicaDb.integrationAdmission.findFirst({
+        where: { jobId: claim!.id, status: 'MAY_HAVE_DISPATCHED' },
+        orderBy: { admittedAt: 'desc' },
+      });
+      check('second replica sees independently committed marker', !!marker);
+      const marked = await replica.markAttemptInFlight(marker!.id, claim!.id, claim!.claimToken!);
+      check('second replica transitions owned attempt to IN_FLIGHT', marked);
+      const uncertain = await control.markAttemptUncertain(marker!.id, claim!.id, claim!.claimToken!);
+      check('first replica durably quarantines IN_FLIGHT as UNCERTAIN', uncertain);
+      const persisted = await replicaDb.integrationAdmission.findUnique({ where: { id: marker!.id } });
+      check('uncertain state visible across replica connections', persisted?.status === 'UNCERTAIN');
+    } finally {
+      await replicaDb.$disconnect();
+    }
     const finalStop = await control.stopFleet('ci-operator', 'TEST_STOP');
     check('stop after callback failure succeeds', finalStop.stopped && finalStop.generation === 3n);
     const after = await control.reserveAdmission(claim!.id, claim!.claimToken!);
