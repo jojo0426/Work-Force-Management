@@ -69,6 +69,8 @@ jobs:
         run: npm run test:phase5d-faults
       - name: Run Phase 5D privacy-safe monitoring baseline
         run: npm run test:phase5d-monitoring
+      - name: Run Phase 5D monitoring execution wiring
+        run: npm run test:phase5d-monitoring-wiring
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
