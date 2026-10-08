@@ -20,6 +20,32 @@ async function main(): Promise<void> {
   const empty = await fake(true, 0).stopAndAssess('ci', 'TEST_STOP');
   check('empty ledger never asserts network drain',
     empty.ledgerEmpty && !empty.externallyDrained && !empty.escalated);
+  let tick = 0;
+  let outstanding = 2;
+  const polling = new IntegrationShutdownDrainService({
+    stopAndInspect: async () => ({
+      acknowledged: true, unresolvedAttempts: outstanding,
+      generation: 2n, externallyDrained: false,
+    }),
+    inspectStopSafety: async () => ({
+      admissionsClosed: true, unresolvedAttempts: outstanding,
+      externalQuiescenceVerified: false, reason: 'STOPPED_WITH_UNCERTAINTY',
+    }),
+  } as any);
+  const timed = await polling.stopAndWaitForLedger('ci', 'TEST_STOP', {
+    timeoutMs: 20, pollIntervalMs: 10,
+    now: () => tick, sleep: async ms => { tick += ms; },
+  });
+  check('bounded polling times out and escalates without network drain',
+    timed.timedOut && timed.escalated && !timed.externallyDrained && timed.polls === 3);
+  tick = 0;
+  outstanding = 1;
+  const settled = await polling.stopAndWaitForLedger('ci', 'TEST_STOP', {
+    timeoutMs: 30, pollIntervalMs: 10,
+    now: () => tick, sleep: async ms => { tick += ms; outstanding = 0; },
+  });
+  check('ledger settles before deadline without asserting network quiescence',
+    !settled.timedOut && settled.ledgerEmpty && !settled.externallyDrained);
   console.log('Phase 5E.2N controlled stop assessment regression passed.');
 }
 main().catch(error => { console.error(error); process.exit(1); });
