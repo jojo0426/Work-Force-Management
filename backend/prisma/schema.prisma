@@ -412,3 +412,19 @@ model IntegrationReconciliationAudit {
 
   @@index([jobId, recordedAt])
 }
+
+
+// Phase 5E.2Q: independently registered reconciliation evidence.
+// There is deliberately no public create/approve endpoint.
+model IntegrationProviderEvidence {
+  id                String   @id @default(uuid())
+  admissionId       String   @unique
+  provider          String
+  providerRequestId String
+  evidenceRef       String
+  confirmedOutcome  String
+  operatorId        String
+  reviewerId        String
+  validated         Boolean  @default(false)
+  recordedAt        DateTime @default(now())
+}
