@@ -76,6 +76,8 @@ async function main(): Promise<void> {
     const evidenceId = stored.evidenceId!;
     const evidence = await db.integrationProviderEvidence.findUnique({ where: { id: evidenceId } });
     check('immutable evidence remains unvalidated', evidence?.validated === false);
+    check('signed receipt provenance durably bound to admission',
+      (await db.integrationMockReceiptReplay.findUnique({ where: { requestId } }))?.admissionId === admissionId);
     check('duplicate receipt denied',
       !(await ingest.ingest(input, { id: keyId, secret }, now)).accepted);
     const attribution = new IntegrationEvidenceAttributionService(db as any);
