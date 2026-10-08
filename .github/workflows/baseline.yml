@@ -96,6 +96,8 @@ jobs:
         run: npm run test:phase5e-shutdown-drain
       - name: Run Phase 5E evidence-gated reconciliation audit regression
         run: npm run test:phase5e-reconciliation-audit
+      - name: Run Phase 5E isolated reconciliation database E2E
+        run: npm run test:phase5e-reconciliation-database
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
