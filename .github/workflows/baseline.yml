@@ -102,6 +102,8 @@ jobs:
         run: npm run test:phase5e-approval-boundary
       - name: Run Phase 5E mock receipt ingestion regression
         run: npm run test:phase5e-mock-receipt-ingestion
+      - name: Run Phase 5E synthetic key lifecycle regression
+        run: npm run test:phase5e-mock-key-lifecycle
       - name: Run Phase 5E authenticated approval HTTP fixture
         run: npm run test:phase5e-approval-http
       - name: Run Phase 5E isolated reconciliation database E2E
