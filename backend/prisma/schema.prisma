@@ -383,6 +383,16 @@ model IntegrationFleetControl {
 
 // Phase 5E.2AE: durable expected membership and generation-bound stop acknowledgments.
 // These records are advisory safety evidence, never proof of provider quiescence.
+// Phase 5E.2AF: deployment-controlled expected worker inventory.
+// Enrollment is an internal, operator-controlled operation; no public route.
+model IntegrationExpectedWorker {
+  workerId       String   @id
+  credentialHash String
+  approvedBy     String
+  approvedAt     DateTime @default(now())
+  retiredAt      DateTime?
+}
+
 model IntegrationWorkerMembership {
   workerId       String   @id
   instanceToken  String
