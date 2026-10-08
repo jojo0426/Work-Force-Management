@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma.service';
-import { ProviderReceipt, verifyMockProviderReceipt } from './provider-receipt-authenticity';
+import { ProviderReceipt } from './provider-receipt-authenticity';
+import { IntegrationMockKeyVerifierService, MockSigningKeyCandidate } from './integration-mock-key-verifier.service';
 
 export type MockReceiptIngestion = Readonly<{
   admissionId: string;
@@ -18,17 +19,20 @@ export type MockReceiptIngestion = Readonly<{
  */
 @Injectable()
 export class IntegrationMockReceiptIngestionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly keys: IntegrationMockKeyVerifierService,
+  ) {}
 
   async ingest(
     input: MockReceiptIngestion,
-    secret: string,
+    key: MockSigningKeyCandidate,
     nowSeconds: number,
   ): Promise<{ accepted: boolean; evidenceId: string | null }> {
     if (!input || !input.admissionId || !input.operatorId ||
         !input.reviewerId || input.operatorId === input.reviewerId ||
         !/^[A-Za-z0-9_./:@-]{3,180}$/.test(input.evidenceRef) ||
-        !verifyMockProviderReceipt(input.receipt, input.signatureHex, secret, nowSeconds)) {
+        !(await this.keys.verify(input.receipt, input.signatureHex, key, nowSeconds))) {
       return { accepted: false, evidenceId: null };
     }
     try {
