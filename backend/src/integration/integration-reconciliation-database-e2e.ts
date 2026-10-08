@@ -15,12 +15,10 @@ async function main(): Promise<void> {
   const jobId = 'reconciliation-e2e-job-' + stamp;
   const admissionId = 'reconciliation-e2e-admission-' + stamp;
   const evidenceId = 'reconciliation-e2e-evidence-' + stamp;
-  let createdControl = false;
   try {
     const existing = await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } });
     check('isolated fleet singleton absent', existing === null);
     await db.integrationFleetControl.create({ data: { id: 'GLOBAL', enabled: false } });
-    createdControl = true;
     await db.integrationJob.create({
       data: {
         id: jobId, sourceSystem: 'PHASE5E2Q_SYNTHETIC',
@@ -72,11 +70,8 @@ async function main(): Promise<void> {
     } catch { immutable = true; }
     check('database audit update trigger rejects tampering', immutable);
   } finally {
-    await db.integrationReconciliationAudit.deleteMany({ where: { admissionId } }).catch(() => {});
-    await db.integrationProviderEvidence.deleteMany({ where: { admissionId } }).catch(() => {});
-    await db.integrationAdmission.deleteMany({ where: { id: admissionId } });
-    await db.integrationJob.deleteMany({ where: { id: jobId } });
-    if (createdControl) await db.integrationFleetControl.delete({ where: { id: 'GLOBAL' } });
+    // Audit/evidence are immutable; the entire CI database is ephemeral.
+    // Do not attempt destructive cleanup of append-only records.
     await db.$disconnect();
   }
   console.log('Phase 5E.2Q isolated PostgreSQL reconciliation E2E passed.');
