@@ -163,12 +163,10 @@ export class IntegrationFleetControlService {
   }
 
   /**
-   * Phase 5E.2G: commit a durable MAY_HAVE_DISPATCHED marker BEFORE any adapter
-   * invocation. Then acquire a second row lock for the actual callback.
-   * Failure of either transaction never erases the committed marker.
-   *
-   * Still experimental: a lost DB connection/timeout may release the row lock
-   * while an external provider operation remains active.
+   * Phase 5E.2K: never hold a database transaction during adapter execution.
+   * A committed MAY_HAVE_DISPATCHED marker precedes the callback; uncertainty
+   * is retained on failure. Stop closes new admissions, but cannot prove an
+   * already admitted external request has ended.
    */
   async withFencedDispatch<T>(
     jobId: string,
@@ -198,37 +196,21 @@ export class IntegrationFleetControlService {
     }, { maxWait: 5_000, timeout: 10_000 });
     if (!prepared) return { admitted: false };
 
-    // The marker is committed. Even if stop wins this second lock, keep the
-    // marker for conservative manual reconciliation rather than auto-retry.
-    return this.prisma.$transaction(async tx => {
-      const rows = await tx.$queryRaw<Array<{ enabled: boolean; generation: bigint }>>`
-        SELECT "enabled", "generation" FROM "IntegrationFleetControl"
-        WHERE "id" = 'GLOBAL' FOR UPDATE
-      `;
-      const marker = await tx.integrationAdmission.findUnique({
-        where: { id: admissionId },
-        select: { generation: true },
-      });
-      if (rows.length !== 1 || rows[0].enabled !== true ||
-          !marker || marker.generation !== rows[0].generation) {
-        return { admitted: false };
-      }
-      const job = await tx.integrationJob.findFirst({
-        where: { id: jobId, claimToken, status: 'PROCESSING' },
-        select: { id: true },
-      });
-      if (!job) return { admitted: false };
-      // Record the dispatch boundary in the transaction. The earlier durable
-      // MAY_HAVE_DISPATCHED marker remains even if this transaction rolls back.
-      const marked = await tx.integrationAdmission.updateMany({
-        where: { id: admissionId, jobId, claimToken, status: 'MAY_HAVE_DISPATCHED' },
-        data: { status: 'IN_FLIGHT' },
-      });
-      if (marked.count !== 1) return { admitted: false };
+    // A second short transaction rechecks stop/generation and records the
+    // in-flight boundary. A stop after this commit can acknowledge while
+    // the callback remains active; unresolved ledger entries remain visible.
+    const started = await this.markAttemptInFlight(admissionId, jobId, claimToken);
+    if (!started) return { admitted: false };
+
+    try {
       const result = await callback();
-      // Do not erase the committed marker on rollback/timeout.
       return { admitted: true, result };
-    }, { maxWait: 5_000, timeout: 30_000 });
+    } catch (error) {
+      // Best effort only: if persistence fails, the committed IN_FLIGHT
+      // record still blocks an optimistic drain result.
+      await this.markAttemptUncertain(admissionId, jobId, claimToken);
+      throw error;
+    }
   }
 
   /**
