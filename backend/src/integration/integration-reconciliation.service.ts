@@ -16,6 +16,7 @@ export type ReconciliationDecision = Readonly<{
   evidenceRef: string;
   reasonCode: string;
   providerEvidence: ProviderIdempotencyEvidence;
+  trustedEvidenceId: string;
 }>;
 
 /**
@@ -32,7 +33,7 @@ export class IntegrationReconciliationService {
     if (!safe(input.admissionId) || !safe(input.operatorId) ||
         !safe(input.reviewerId) || input.operatorId === input.reviewerId ||
         !safe(input.provider) || !safe(input.providerRequestId) ||
-        !safe(input.evidenceRef) || !safe(input.reasonCode) ||
+        !safe(input.evidenceRef) || !safe(input.trustedEvidenceId) || !safe(input.reasonCode) ||
         !['CONFIRMED_APPLIED', 'CONFIRMED_NOT_APPLIED'].includes(input.outcome) ||
         input.providerEvidence.provider !== input.provider ||
         !providerIsSafeForAutomatedReconciliation(input.providerEvidence)) return false;
@@ -56,6 +57,20 @@ export class IntegrationReconciliationService {
         });
         // Prevent an operator from masking an actively processing claim.
         if (!job || job.status === 'PROCESSING') return false;
+        // Registry evidence is a persisted independent record, not the caller's
+        // assertion. Both approval identities must be distinct and recorded.
+        const trusted = await tx.integrationProviderEvidence.findUnique({
+          where: { id: input.trustedEvidenceId },
+        });
+        if (!trusted || trusted.admissionId !== input.admissionId ||
+            trusted.provider !== input.provider ||
+            trusted.providerRequestId !== input.providerRequestId ||
+            trusted.evidenceRef !== input.evidenceRef ||
+            trusted.confirmedOutcome !== input.outcome ||
+            trusted.operatorId !== input.operatorId ||
+            trusted.reviewerId !== input.reviewerId ||
+            trusted.operatorId === trusted.reviewerId ||
+            trusted.validated !== true) return false;
         await tx.integrationReconciliationAudit.create({
           data: {
             id: randomUUID(), admissionId: input.admissionId,
