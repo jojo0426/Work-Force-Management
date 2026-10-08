@@ -53,13 +53,13 @@ async function main(): Promise<void> {
     !(await service.ingest(input, { id: 'synthetic-key-v1', secret }, now)).accepted && writes === 0);
   mismatch = false;
   check('valid mock receipt persisted',
-    (await service.ingest(input, secret, now)).accepted && writes === 2);
+    (await service.ingest(input, { id: 'synthetic-key-v1', secret }, now)).accepted && writes === 2);
   check('receipt cannot assert verified operator or reviewer',
     evidence?.validated === false &&
     evidence?.operatorId === 'PENDING_AUTHENTICATED_PROPOSAL' &&
     evidence?.reviewerId === 'PENDING_AUTHENTICATED_REVIEW');
   check('replayed receipt rejected',
-    !(await service.ingest(input, secret, now)).accepted && writes === 2);
+    !(await service.ingest(input, { id: 'synthetic-key-v1', secret }, now)).accepted && writes === 2);
   console.log('Phase 5E.2U mock receipt ingestion regression passed.');
 }
 main().catch(error => { console.error(error); process.exit(1); });
