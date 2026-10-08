@@ -175,6 +175,22 @@ export class IntegrationFleetControlService {
   }
 
   /**
+   * A successful worker completion can settle the committed attempt only
+   * after its claim has completed. Failure/timeout leaves it unresolved.
+   */
+  async settleCompletedClaim(jobId: string, claimToken: string): Promise<number> {
+    const completed = await this.prisma.integrationJob.findUnique({
+      where: { id: jobId }, select: { status: true, claimToken: true },
+    });
+    if (!completed || completed.status !== 'COMPLETED' || completed.claimToken !== null) return 0;
+    const settled = await this.prisma.integrationAdmission.updateMany({
+      where: { jobId, claimToken, status: 'MAY_HAVE_DISPATCHED' },
+      data: { status: 'SETTLED', releasedAt: new Date() },
+    });
+    return settled.count;
+  }
+
+  /**
    * Reserves an admission before dispatch, with a row lock shared with stop.
    * This reservation is NOT sufficient by itself to guarantee the request
    * starts before stop acknowledgement: a worker may pause after commit.
