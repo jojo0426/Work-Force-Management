@@ -385,6 +385,20 @@ model IntegrationFleetControl {
 // These records are advisory safety evidence, never proof of provider quiescence.
 // Phase 5E.2AF: deployment-controlled expected worker inventory.
 // Enrollment is an internal, operator-controlled operation; no public route.
+// Phase 5E.2AH: immutable two-actor worker roster governance evidence.
+// Not a production identity-provider integration.
+model IntegrationWorkerGovernanceEvent {
+  id          String   @id @default(uuid())
+  workerId    String
+  operation   String
+  action      String
+  actorId     String
+  sessionHash String
+  createdAt   DateTime @default(now())
+  @@unique([workerId, operation, actorId, action])
+  @@index([workerId, operation, action])
+}
+
 model IntegrationExpectedWorker {
   workerId       String   @id
   credentialHash String
