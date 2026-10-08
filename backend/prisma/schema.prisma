@@ -456,5 +456,16 @@ model IntegrationMockReceiptReplay {
   recordedAt  DateTime @default(now())
 
   @@unique([requestId, issuedAt, signature])
+  @@unique([requestId])
   @@index([admissionId])
+}
+
+// Phase 5E.2V: immutable synthetic signing-key metadata, no raw secret.
+model IntegrationMockSigningKey {
+  id          String   @id
+  fingerprint String
+  validFrom   DateTime
+  validUntil  DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
 }
