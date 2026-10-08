@@ -47,6 +47,14 @@ async function main(): Promise<void> {
       ],
     });
     // The registry is immutable: use the actual synthetic user IDs from the outset.
+    await db.integrationApprovalEvent.createMany({
+      data: [
+        { admissionId, evidenceId, actorUserId: 'synthetic-operator-' + stamp,
+          action: 'PROPOSE', sessionIdHash: 'synthetic-session-hash-proposal' },
+        { admissionId, evidenceId, actorUserId: 'synthetic-reviewer-' + stamp,
+          action: 'APPROVE', sessionIdHash: 'synthetic-session-hash-approval' },
+      ],
+    });
     const service = new IntegrationReconciliationService(db as any);
     const request = {
       admissionId, operatorId: 'synthetic-operator-' + stamp, reviewerId: 'synthetic-reviewer-' + stamp,
