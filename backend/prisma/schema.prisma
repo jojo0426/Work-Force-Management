@@ -395,10 +395,8 @@ model IntegrationAdmission {
 }
 
 
-/**
- * Phase 5E.2P: append-only evidence-backed operator resolution record.
- * No public write endpoint; database grants/trigger protect updates/deletes.
- */
+// Phase 5E.2P: append-only evidence-backed operator resolution record.
+// No public write endpoint; migration trigger rejects updates and deletes.
 model IntegrationReconciliationAudit {
   id               String   @id @default(uuid())
   admissionId      String   @unique
