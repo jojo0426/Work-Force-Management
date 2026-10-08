@@ -367,3 +367,30 @@ model Transfer {
   installEvidence String[]  @default([])
   createdAt       DateTime  @default(now())
 }
+
+
+// Phase 5E.2 fleet-wide admission control. Disabled until explicitly approved.
+// This model alone does not enforce admission fencing or worker safety.
+model IntegrationFleetControl {
+  id         String   @id @default("GLOBAL")
+  enabled    Boolean  @default(false)
+  generation BigInt   @default(0)
+  stoppedAt  DateTime?
+  stoppedBy  String?
+  reasonCode String?
+  updatedAt  DateTime @updatedAt
+}
+
+model IntegrationAdmission {
+  id          String    @id @default(uuid())
+  jobId       String
+  claimToken  String
+  generation  BigInt
+  status      String    @default("ADMITTED")
+  admittedAt  DateTime  @default(now())
+  releasedAt  DateTime?
+
+  @@index([jobId, claimToken])
+  @@index([status, generation])
+}
+
