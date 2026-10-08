@@ -85,6 +85,56 @@ export class IntegrationFleetControlService {
     return updated.count === 1;
   }
 
+  /**
+   * Conservative durable lifecycle transition for a previously committed
+   * attempt. Only a matching owner may mark its dispatch boundary.
+   * No provider call is authorized by this method alone.
+   */
+  async markAttemptInFlight(admissionId: string, jobId: string, claimToken: string): Promise<boolean> {
+    if (!admissionId || !jobId || !claimToken) return false;
+    try {
+      return await this.prisma.$transaction(async tx => {
+        const rows = await tx.$queryRaw<Array<{ enabled: boolean; generation: bigint }>>`
+          SELECT "enabled", "generation" FROM "IntegrationFleetControl"
+          WHERE "id" = 'GLOBAL' FOR UPDATE
+        `;
+        if (rows.length !== 1 || rows[0].enabled !== true) return false;
+        const job = await tx.integrationJob.findFirst({
+          where: { id: jobId, claimToken, status: 'PROCESSING' },
+          select: { id: true },
+        });
+        if (!job) return false;
+        const changed = await tx.integrationAdmission.updateMany({
+          where: {
+            id: admissionId, jobId, claimToken,
+            generation: rows[0].generation, status: 'MAY_HAVE_DISPATCHED',
+          },
+          data: { status: 'IN_FLIGHT' },
+        });
+        return changed.count === 1;
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /** Conservative, durable uncertain-outcome transition; never auto-retry. */
+  async markAttemptUncertain(admissionId: string, jobId: string, claimToken: string): Promise<boolean> {
+    if (!admissionId || !jobId || !claimToken) return false;
+    try {
+      const changed = await this.prisma.integrationAdmission.updateMany({
+        where: {
+          id: admissionId, jobId, claimToken,
+          status: { in: ['MAY_HAVE_DISPATCHED', 'IN_FLIGHT'] },
+        },
+        data: { status: 'UNCERTAIN' },
+      });
+      return changed.count === 1;
+    } catch {
+      return false;
+    }
+  }
+
   /** No remote enable path is provided. Never creates the control row. */
   async stopFleet(actor: string, reasonCode: string): Promise<{ stopped: boolean; generation: bigint | null }> {
     const safeActor = String(actor || '').trim();
