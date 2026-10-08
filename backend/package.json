@@ -82,7 +82,8 @@
         "test:phase5e-mock-receipt-database": "ts-node src/integration/integration-mock-receipt-database-e2e.ts",
         "test:phase5e-evidence-attribution": "ts-node src/integration/integration-evidence-attribution-selftest.ts",
         "test:phase5e-synthetic-reconciliation-database": "ts-node src/integration/integration-synthetic-reconciliation-database-e2e.ts",
-        "test:phase5e-evidence-http-session": "ts-node src/integration/integration-evidence-http-session-selftest.ts"
+        "test:phase5e-evidence-http-session": "ts-node src/integration/integration-evidence-http-session-selftest.ts",
+        "test:phase5e-fleet-stop-contract-database": "ts-node src/integration/integration-fleet-stop-contract-database-e2e.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
