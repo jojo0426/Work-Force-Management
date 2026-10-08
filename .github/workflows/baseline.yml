@@ -78,6 +78,8 @@ jobs:
         run: npm run test:phase5d-release
       - name: Run Phase 5E mock provider acceptance
         run: npm run test:phase5e-provider
+      - name: Run Phase 5E fleet control foundation selftest
+        run: npm run test:phase5e-fleet-foundation
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
