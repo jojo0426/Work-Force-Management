@@ -135,6 +135,32 @@ export class IntegrationFleetControlService {
     }
   }
 
+  /**
+   * Strict dispatch-start authorization is deliberately NOT claimed here:
+   * a database commit cannot atomically authorize an external network send.
+   * Return a conservative status for operator-facing stop decisions.
+   */
+  async inspectStopSafety(): Promise<{
+    admissionsClosed: boolean;
+    externalQuiescenceVerified: false;
+    unresolvedAttempts: number | null;
+    reason: 'STOPPED_WITH_UNCERTAINTY' | 'STOPPED_LEDGER_EMPTY' | 'ENABLED' | 'UNAVAILABLE';
+  }> {
+    const state = await this.inspectDrain();
+    if (!state.stopped) {
+      return {
+        admissionsClosed: false, externalQuiescenceVerified: false,
+        unresolvedAttempts: state.unresolved,
+        reason: state.reason === 'ENABLED' ? 'ENABLED' : 'UNAVAILABLE',
+      };
+    }
+    return {
+      admissionsClosed: true, externalQuiescenceVerified: false,
+      unresolvedAttempts: state.unresolved,
+      reason: state.unresolved === 0 ? 'STOPPED_LEDGER_EMPTY' : 'STOPPED_WITH_UNCERTAINTY',
+    };
+  }
+
   /** No remote enable path is provided. Never creates the control row. */
   async stopFleet(actor: string, reasonCode: string): Promise<{ stopped: boolean; generation: bigint | null }> {
     const safeActor = String(actor || '').trim();
