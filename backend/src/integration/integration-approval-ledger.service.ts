@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma.service';
 
 export type VerifiedApprovalActor = Readonly<{
   userId: string;
-  sessionId: string;
+  sessionHash: string;
   role: 'SUPERVISOR' | 'ADMINISTRATOR';
 }>;
 
@@ -22,7 +22,7 @@ export class IntegrationApprovalLedgerService {
     evidenceId: string,
     action: 'PROPOSE' | 'APPROVE',
   ): Promise<boolean> {
-    if (!actor?.userId || !actor.sessionId || actor.sessionId.length < 16 ||
+    if (!actor?.userId || !actor.sessionHash || !/^[a-f0-9]{64}$/.test(actor.sessionHash) ||
         !['SUPERVISOR', 'ADMINISTRATOR'].includes(actor.role) ||
         !admissionId || !evidenceId || !['PROPOSE', 'APPROVE'].includes(action)) return false;
     try {
@@ -49,7 +49,7 @@ export class IntegrationApprovalLedgerService {
           data: {
             id: randomUUID(), admissionId, actorUserId: actor.userId,
             evidenceId, action,
-            sessionIdHash: createHash('sha256').update(actor.sessionId).digest('hex'),
+            sessionIdHash: actor.sessionHash,
           },
         });
         return true;
