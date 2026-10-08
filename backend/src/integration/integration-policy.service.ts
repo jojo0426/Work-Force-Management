@@ -10,6 +10,8 @@ export type IntegrationPolicy = {
 @Injectable()
 export class IntegrationPolicyService {
   private readonly policy: IntegrationPolicy;
+  // Runtime emergency stop is one-way until process restart; no remote re-enable API.
+  private emergencyStopped = false;
 
   constructor() {
     this.policy = this.readPolicy(process.env);
@@ -18,8 +20,17 @@ export class IntegrationPolicyService {
   getPolicy(): IntegrationPolicy {
     return {
       ...this.policy,
+      executionEnabled: this.policy.executionEnabled && !this.emergencyStopped,
       allowedTargets: [...this.policy.allowedTargets],
     };
+  }
+
+  emergencyStop(): void {
+    this.emergencyStopped = true;
+  }
+
+  isEmergencyStopped(): boolean {
+    return this.emergencyStopped;
   }
 
   isTargetAllowed(target: string): boolean {
