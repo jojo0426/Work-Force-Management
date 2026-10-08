@@ -94,6 +94,8 @@ jobs:
         run: npm run test:phase5e-stop-safety
       - name: Run Phase 5E controlled shutdown drain regression
         run: npm run test:phase5e-shutdown-drain
+      - name: Run Phase 5E evidence-gated reconciliation audit regression
+        run: npm run test:phase5e-reconciliation-audit
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
