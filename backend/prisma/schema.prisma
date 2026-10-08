@@ -469,3 +469,17 @@ model IntegrationMockSigningKey {
   revokedAt   DateTime?
   createdAt   DateTime @default(now())
 }
+
+// Phase 5E.2X: append-only independent identity attribution for signed evidence.
+model IntegrationEvidenceAttribution {
+  id            String   @id @default(uuid())
+  evidenceId    String
+  admissionId   String
+  actorUserId   String
+  action        String
+  sessionHash   String
+  recordedAt    DateTime @default(now())
+
+  @@unique([evidenceId, actorUserId, action])
+  @@index([evidenceId, action])
+}
