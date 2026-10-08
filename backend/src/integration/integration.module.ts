@@ -1,3 +1,5 @@
+import { IntegrationEvidenceAttributionService } from './integration-evidence-attribution.service';
+import { IntegrationEvidenceAttributionController } from './integration-evidence-attribution.controller';
 import { Module } from '@nestjs/common';
 import { IntegrationApprovalController } from './integration-approval.controller';
 import { IntegrationController } from './integration.controller';
@@ -17,5 +19,5 @@ import { IntegrationReconciliationService } from './integration-reconciliation.s
 import { PrismaService } from '../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 
-@Module({ imports: [AuthModule], controllers: [IntegrationController, IntegrationApprovalController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationFleetControlService, IntegrationReconciliationService, IntegrationApprovalLedgerService, IntegrationMockReceiptIngestionService, IntegrationMockKeyVerifierService, IntegrationHealthMetricsService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
+@Module({ imports: [AuthModule], controllers: [IntegrationController, IntegrationApprovalController, IntegrationEvidenceAttributionController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationFleetControlService, IntegrationReconciliationService, IntegrationApprovalLedgerService, IntegrationEvidenceAttributionService, IntegrationMockReceiptIngestionService, IntegrationMockKeyVerifierService, IntegrationHealthMetricsService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
 export class IntegrationModule {}
