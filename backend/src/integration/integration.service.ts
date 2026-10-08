@@ -65,6 +65,23 @@ export class IntegrationService {
     return this.prisma.$transaction(async (tx) => {
       const current = await tx.integrationJob.findFirst({ where: { id: jobId, status: 'PROCESSING', claimToken } });
       if (!current) throw new Error('Integration job claim is no longer owned by this token');
+      // Any committed dispatch marker means a provider may already have acted.
+      // Do not auto-retry even if an adapter reports a transient failure.
+      const possibleDispatch = await tx.integrationAdmission.count({
+        where: { jobId, claimToken },
+      });
+      if (possibleDispatch > 0) {
+        const quarantined = await tx.integrationJob.updateMany({
+          where: { id: jobId, status: 'PROCESSING', claimToken },
+          data: {
+            status: 'RECONCILIATION_REQUIRED',
+            lastError: 'Provider outcome uncertain; reconcile before retry',
+            claimToken: null, claimedAt: null,
+          },
+        });
+        if (quarantined.count !== 1) throw new Error('Integration claim changed during reconciliation quarantine');
+        return tx.integrationJob.findUnique({ where: { id: jobId } });
+      }
       const retries = current.retries + 1;
       const exhausted = retries >= current.maxRetries;
       const terminal = retryable === false || exhausted;
