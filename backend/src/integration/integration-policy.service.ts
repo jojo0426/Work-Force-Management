@@ -10,6 +10,8 @@ export type IntegrationPolicy = {
 @Injectable()
 export class IntegrationPolicyService {
   private readonly policy: IntegrationPolicy;
+  // Runtime emergency stop is one-way until process restart; no remote re-enable API.
+  private emergencyStopped = false;
 
   constructor() {
     this.policy = this.readPolicy(process.env);
@@ -18,8 +20,17 @@ export class IntegrationPolicyService {
   getPolicy(): IntegrationPolicy {
     return {
       ...this.policy,
+      executionEnabled: this.policy.executionEnabled && !this.emergencyStopped,
       allowedTargets: [...this.policy.allowedTargets],
     };
+  }
+
+  emergencyStop(): void {
+    this.emergencyStopped = true;
+  }
+
+  isEmergencyStopped(): boolean {
+    return this.emergencyStopped;
   }
 
   isTargetAllowed(target: string): boolean {
@@ -70,6 +81,10 @@ export class IntegrationPolicyService {
     if (!Number.isSafeInteger(parsed) || parsed <= 0) {
       throw new Error(`${name} must be a positive safe integer`);
     }
+    const maximum = name === 'INTEGRATION_EXECUTION_TIMEOUT_MS' ? 300_000 : 86_400_000;
+    if (parsed > maximum) {
+      throw new Error(`${name} exceeds the allowed maximum of ${maximum}ms`);
+    }
     return parsed;
   }
 
@@ -77,7 +92,7 @@ export class IntegrationPolicyService {
     const normalized = String(target || '').trim().toUpperCase();
     if (!normalized) throw new Error('Integration target is required');
     if (!/^[A-Z0-9][A-Z0-9_-]*$/.test(normalized)) {
-      throw new Error(`Invalid integration target ${normalized}`);
+      throw new Error('Invalid integration target');
     }
     return normalized;
   }

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { IntegrationHealthMetricsService } from './integration-health-metrics.service';
 import { IntegrationPolicyService } from './integration-policy.service';
 
 export type IntegrationExecutionContext = {
@@ -50,7 +51,7 @@ export class IntegrationExecutorService {
   private executionEnabled = false;
   private executionTimeoutMs: number | null = null;
 
-  constructor(private readonly policyService?: IntegrationPolicyService) {}
+  constructor(private readonly policyService?: IntegrationPolicyService, @Optional() private readonly healthMetrics?: IntegrationHealthMetricsService) {}
 
   registerAdapter(target: string, adapter: IntegrationAdapter): void {
     const normalizedTarget = this.normalizeTarget(target);
@@ -89,6 +90,7 @@ export class IntegrationExecutorService {
     const executionTimeoutMs = policy ? policy.executionTimeoutMs : this.executionTimeoutMs;
 
     if (!executionEnabled) {
+      this.healthMetrics?.record('BLOCKED');
       return {
         status: 'BLOCKED',
         targetSystem,
@@ -98,6 +100,7 @@ export class IntegrationExecutorService {
     }
 
     if (!targetAllowed) {
+      this.healthMetrics?.record('BLOCKED');
       return {
         status: 'BLOCKED',
         targetSystem,
@@ -108,6 +111,7 @@ export class IntegrationExecutorService {
 
     const adapter = this.adapters.get(targetSystem);
     if (!adapter) {
+      this.healthMetrics?.record('PERMANENT');
       throw new IntegrationExecutionError(
         `Allowed integration target ${targetSystem} has no registered adapter`,
         'PERMANENT',
@@ -143,16 +147,20 @@ export class IntegrationExecutorService {
         }
       }
     } catch (error) {
-      if (error instanceof IntegrationExecutionError) throw error;
-      const message = error instanceof Error ? error.message : String(error);
-      throw new IntegrationExecutionError(
-        message,
-        'TRANSIENT',
-        true,
-      );
+      const classified = error instanceof IntegrationExecutionError
+        ? error
+        : new IntegrationExecutionError(error instanceof Error ? error.message : String(error), 'TRANSIENT', true);
+      this.healthMetrics?.record(classified.classification);
+      throw classified;
     }
 
-    this.validateAdapterResult(targetSystem, adapterResult);
+    try {
+      this.validateAdapterResult(targetSystem, adapterResult);
+    } catch (error) {
+      if (error instanceof IntegrationExecutionError) this.healthMetrics?.record(error.classification);
+      throw error;
+    }
+    this.healthMetrics?.record('EXECUTED');
 
     return {
       status: 'EXECUTED',
