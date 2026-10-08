@@ -86,7 +86,8 @@
         "test:phase5e-fleet-stop-contract-database": "ts-node src/integration/integration-fleet-stop-contract-database-e2e.ts",
         "test:phase5e-dispatch-fence-contract": "ts-node src/integration/integration-dispatch-fence-contract-selftest.ts",
         "test:phase5e-worker-quiescence": "ts-node src/integration/integration-worker-quiescence-contract-selftest.ts",
-        "test:phase5e-worker-membership-database": "ts-node src/integration/integration-worker-membership-database-e2e.ts"
+        "test:phase5e-worker-membership-database": "ts-node src/integration/integration-worker-membership-database-e2e.ts",
+        "test:phase5e-trusted-worker-database": "ts-node src/integration/integration-trusted-worker-database-e2e.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
