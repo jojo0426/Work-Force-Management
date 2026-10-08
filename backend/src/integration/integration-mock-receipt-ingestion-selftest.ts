@@ -18,6 +18,7 @@ async function main(): Promise<void> {
     .digest('hex');
   let saved = false;
   let writes = 0;
+  let evidence: any = null;
   let mismatch = false;
   const prisma: any = {
     $transaction: async (fn: (tx: any) => Promise<any>) => {
@@ -33,7 +34,7 @@ async function main(): Promise<void> {
     integrationMockReceiptReplay: {
       create: async () => { saved = true; writes += 1; },
     },
-    integrationProviderEvidence: { create: async () => { writes += 1; } },
+    integrationProviderEvidence: { create: async ({ data }: any) => { evidence = data; writes += 1; } },
   };
   const service = new IntegrationMockReceiptIngestionService(prisma, {
     verify: async (r: any, sig: string, key: any, at: number) =>
@@ -41,8 +42,7 @@ async function main(): Promise<void> {
       verifyMockProviderReceipt(r, sig, key.secret, at),
   } as any);
   const input = {
-    admissionId: 'admission-1', operatorId: 'operator-1',
-    reviewerId: 'reviewer-2', evidenceRef: 'synthetic/receipt-1',
+    admissionId: 'admission-1', evidenceRef: 'synthetic/receipt-1',
     receipt, signatureHex,
   };
   check('invalid signature rejected', !(await service.ingest({
@@ -54,6 +54,10 @@ async function main(): Promise<void> {
   mismatch = false;
   check('valid mock receipt persisted',
     (await service.ingest(input, secret, now)).accepted && writes === 2);
+  check('receipt cannot assert verified operator or reviewer',
+    evidence?.validated === false &&
+    evidence?.operatorId === 'PENDING_AUTHENTICATED_PROPOSAL' &&
+    evidence?.reviewerId === 'PENDING_AUTHENTICATED_REVIEW');
   check('replayed receipt rejected',
     !(await service.ingest(input, secret, now)).accepted && writes === 2);
   console.log('Phase 5E.2U mock receipt ingestion regression passed.');
