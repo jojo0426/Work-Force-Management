@@ -63,6 +63,8 @@ jobs:
         run: npm run test:phase5c-database
       - name: Run Phase 5D configuration preflight baseline
         run: npm run test:phase5d-config
+      - name: Run Phase 5D mock provider connectivity contract
+        run: npm run test:phase5d-sandbox
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
