@@ -71,6 +71,8 @@ jobs:
         run: npm run test:phase5d-monitoring
       - name: Run Phase 5D monitoring execution wiring
         run: npm run test:phase5d-monitoring-wiring
+      - name: Run Phase 5D controlled activation safety
+        run: npm run test:phase5d-activation
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
