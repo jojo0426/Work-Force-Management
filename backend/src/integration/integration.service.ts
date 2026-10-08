@@ -67,9 +67,9 @@ export class IntegrationService {
       if (!current) throw new Error('Integration job claim is no longer owned by this token');
       // Any committed dispatch marker means a provider may already have acted.
       // Do not auto-retry even if an adapter reports a transient failure.
-      const possibleDispatch = await tx.integrationAdmission.count({
-        where: { jobId, claimToken },
-      });
+      const possibleDispatch = tx.integrationAdmission?.count
+        ? await tx.integrationAdmission.count({ where: { jobId, claimToken } })
+        : 0;
       if (possibleDispatch > 0) {
         const quarantined = await tx.integrationJob.updateMany({
           where: { id: jobId, status: 'PROCESSING', claimToken },
@@ -107,9 +107,11 @@ export class IntegrationService {
     for (const candidate of candidates) {
       // Never blindly replay a stale claim that may have crossed the
       // external dispatch boundary. Persist quarantine for reconciliation.
-      const admissions = await this.prisma.integrationAdmission.count({
-        where: { jobId: candidate.id, claimToken: candidate.claimToken },
-      });
+      const admissions = this.prisma.integrationAdmission?.count
+        ? await this.prisma.integrationAdmission.count({
+            where: { jobId: candidate.id, claimToken: candidate.claimToken },
+          })
+        : 0;
       if (admissions > 0) {
         const quarantined = await this.prisma.integrationJob.updateMany({
           where: {
