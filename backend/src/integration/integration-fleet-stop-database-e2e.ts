@@ -96,6 +96,8 @@ async function main(): Promise<void> {
     }
     const finalStop = await control.stopFleet('ci-operator', 'TEST_STOP');
     check('stop after callback failure succeeds', finalStop.stopped && finalStop.generation === 3n);
+    const drainAfterStop = await control.inspectDrain();
+    check('stopped fleet with uncertain attempt cannot claim drained', drainAfterStop.stopped && !drainAfterStop.drained && drainAfterStop.unresolved !== null && drainAfterStop.unresolved > 0);
     const after = await control.reserveAdmission(claim!.id, claim!.claimToken!);
     check('post-stop admission is blocked', !after.admitted);
     const row = await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } });
