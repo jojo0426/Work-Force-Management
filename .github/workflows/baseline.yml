@@ -10,6 +10,7 @@ on:
       - wfm-phase-3-workorder-dispatch
       - wfm-phase-4-operations
       - wfm-phase-5c7-classification-retry
+      - wfm-phase-5d-operational-readiness
   pull_request:
     branches:
       - main
@@ -60,6 +61,8 @@ jobs:
         run: npm run test:phase5c
       - name: Run Phase 5C integration database closure suite
         run: npm run test:phase5c-database
+      - name: Run Phase 5D configuration preflight baseline
+        run: npm run test:phase5d-config
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
