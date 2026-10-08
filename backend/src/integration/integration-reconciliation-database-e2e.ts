@@ -36,10 +36,17 @@ async function main(): Promise<void> {
         id: evidenceId, admissionId, provider: 'MOCK',
         providerRequestId: 'synthetic-request-1', evidenceRef: 'synthetic/evidence-1',
         confirmedOutcome: 'CONFIRMED_NOT_APPLIED',
-        operatorId: 'synthetic-operator', reviewerId: 'synthetic-reviewer',
+        operatorId: 'synthetic-operator-' + stamp, reviewerId: 'synthetic-reviewer-' + stamp,
         validated: true,
       },
     });
+    await db.user.createMany({
+      data: [
+        { id: 'synthetic-operator-' + stamp, name: 'Synthetic Operator', role: 'SUPERVISOR', isActive: true },
+        { id: 'synthetic-reviewer-' + stamp, name: 'Synthetic Reviewer', role: 'ADMINISTRATOR', isActive: true },
+      ],
+    });
+    // The registry is immutable: use the actual synthetic user IDs from the outset.
     const service = new IntegrationReconciliationService(db as any);
     const request = {
       admissionId, operatorId: 'synthetic-operator', reviewerId: 'synthetic-reviewer',
