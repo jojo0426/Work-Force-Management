@@ -98,6 +98,8 @@ jobs:
         run: npm run test:phase5e-trusted-worker-database
       - name: Run Phase 5E.2AG worker restart and identity race PostgreSQL E2E
         run: npm run test:phase5e-worker-restart-database
+      - name: Run Phase 5E.2AH worker governance PostgreSQL E2E
+        run: npm run test:phase5e-worker-governance-database
       - name: Run Phase 5E reconciliation quarantine regression
         run: npm run test:phase5e-reconciliation
       - name: Run Phase 5E drain status regression
