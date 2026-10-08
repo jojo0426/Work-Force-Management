@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { IntegrationApprovalController } from './integration-approval.controller';
 import { IntegrationController } from './integration.controller';
 import { IntegrationService } from './integration.service';
 import { IntegrationWorkerService } from './integration-worker.service';
@@ -14,5 +15,5 @@ import { IntegrationReconciliationService } from './integration-reconciliation.s
 import { PrismaService } from '../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 
-@Module({ imports: [AuthModule], controllers: [IntegrationController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationFleetControlService, IntegrationReconciliationService, IntegrationApprovalLedgerService, IntegrationHealthMetricsService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
+@Module({ imports: [AuthModule], controllers: [IntegrationController, IntegrationApprovalController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationFleetControlService, IntegrationReconciliationService, IntegrationApprovalLedgerService, IntegrationHealthMetricsService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
 export class IntegrationModule {}
