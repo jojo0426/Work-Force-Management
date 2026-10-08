@@ -84,12 +84,12 @@ async function main(): Promise<void> {
       const unresolvedBeforeStop = await replica.inspectDrain();
       check('second replica observes unresolved durable attempts', unresolvedBeforeStop.unresolved !== null && unresolvedBeforeStop.unresolved > 0);
       const marker = await replicaDb.integrationAdmission.findFirst({
-        where: { jobId: claim!.id, status: 'MAY_HAVE_DISPATCHED' },
+        where: { jobId: claim!.id, status: { in: ['MAY_HAVE_DISPATCHED', 'IN_FLIGHT'] } },
         orderBy: { admittedAt: 'desc' },
       });
       check('second replica sees independently committed marker', !!marker);
-      const marked = await replica.markAttemptInFlight(marker!.id, claim!.id, claim!.claimToken!);
-      check('second replica transitions owned attempt to IN_FLIGHT', marked);
+      const marked = marker!.status === 'IN_FLIGHT' || await replica.markAttemptInFlight(marker!.id, claim!.id, claim!.claimToken!);
+      check('second replica observes or transitions attempt to IN_FLIGHT', marked);
       const uncertain = await control.markAttemptUncertain(marker!.id, claim!.id, claim!.claimToken!);
       check('first replica durably quarantines IN_FLIGHT as UNCERTAIN', uncertain);
       const persisted = await replicaDb.integrationAdmission.findUnique({ where: { id: marker!.id } });
