@@ -66,7 +66,8 @@
         "test:phase5e-provider": "ts-node src/integration/provider-acceptance-contract-selftest.ts",
         "test:phase5e-fleet-foundation": "ts-node src/integration/integration-fleet-control-selftest.ts",
         "test:phase5e-fleet-stop": "ts-node src/integration/integration-fleet-stop-selftest.ts",
-        "test:phase5e-fleet-wiring": "ts-node src/integration/integration-fleet-wiring-selftest.ts"
+        "test:phase5e-fleet-wiring": "ts-node src/integration/integration-fleet-wiring-selftest.ts",
+        "test:phase5e-fleet-database": "ts-node src/integration/integration-fleet-stop-database-e2e.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
