@@ -92,6 +92,8 @@ jobs:
         run: npm run test:phase5e-drain
       - name: Run Phase 5E strict stop safety regression
         run: npm run test:phase5e-stop-safety
+      - name: Run Phase 5E controlled shutdown drain regression
+        run: npm run test:phase5e-shutdown-drain
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
