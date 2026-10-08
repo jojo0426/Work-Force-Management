@@ -45,6 +45,16 @@ export class IntegrationService {
     });
   }
 
+  /** Return a claimed job to PENDING without spending retry budget when fleet execution is paused. */
+  async pauseClaimedJob(jobId: string, claimToken: string) {
+    const updated = await this.prisma.integrationJob.updateMany({
+      where: { id: jobId, status: 'PROCESSING', claimToken },
+      data: { status: 'PENDING', claimToken: null, claimedAt: null },
+    });
+    if (updated.count !== 1) throw new Error('Integration job claim is no longer owned by this token');
+    return this.prisma.integrationJob.findUnique({ where: { id: jobId } });
+  }
+
   async completeClaimedJob(jobId: string, claimToken: string, completedAt = new Date()) {
     const claimed = await this.prisma.integrationJob.updateMany({ where: { id: jobId, status: 'PROCESSING', claimToken }, data: { status: 'COMPLETED', completedAt, processedAt: completedAt, claimToken: null, claimedAt: null, lastError: null } });
     if (claimed.count !== 1) throw new Error('Integration job claim is no longer owned by this token');
