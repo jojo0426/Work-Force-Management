@@ -63,6 +63,44 @@ export class IntegrationFleetControlService {
   }
 
   /**
+   * Experimental bounded dispatch fence. The singleton row lock remains held
+   * until the callback settles, so stopFleet cannot acknowledge while the
+   * callback is starting/running. Never use for real providers before
+   * uncertain-outcome reconciliation and timeout/drain acceptance.
+   */
+  async withFencedDispatch<T>(
+    jobId: string,
+    claimToken: string,
+    callback: () => Promise<T>,
+  ): Promise<{ admitted: boolean; result?: T }> {
+    if (!jobId || !claimToken) return { admitted: false };
+    return this.prisma.$transaction(async tx => {
+      const rows = await tx.$queryRaw<Array<{ enabled: boolean; generation: bigint }>>`
+        SELECT "enabled", "generation" FROM "IntegrationFleetControl"
+        WHERE "id" = 'GLOBAL' FOR UPDATE
+      `;
+      if (rows.length !== 1 || rows[0].enabled !== true) return { admitted: false };
+      const job = await tx.integrationJob.findFirst({
+        where: { id: jobId, claimToken, status: 'PROCESSING' },
+        select: { id: true },
+      });
+      if (!job) return { admitted: false };
+      const admissionId = randomUUID();
+      await tx.integrationAdmission.create({
+        data: { id: admissionId, jobId, claimToken, generation: rows[0].generation, status: 'ADMITTED' },
+      });
+      // This awaits the full adapter operation while retaining the row lock.
+      // Timeout/connection loss can still leave external effects ambiguous.
+      const result = await callback();
+      await tx.integrationAdmission.update({
+        where: { id: admissionId },
+        data: { status: 'SETTLED', releasedAt: new Date() },
+      });
+      return { admitted: true, result };
+    }, { maxWait: 5_000, timeout: 30_000 });
+  }
+
+  /**
    * Reserves an admission before dispatch, with a row lock shared with stop.
    * This reservation is NOT sufficient by itself to guarantee the request
    * starts before stop acknowledgement: a worker may pause after commit.
