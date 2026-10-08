@@ -66,11 +66,27 @@ export class IntegrationReconciliationService {
             trusted.provider !== input.provider ||
             trusted.providerRequestId !== input.providerRequestId ||
             trusted.evidenceRef !== input.evidenceRef ||
-            trusted.confirmedOutcome !== input.outcome ||
-            trusted.operatorId !== input.operatorId ||
-            trusted.reviewerId !== input.reviewerId ||
-            trusted.operatorId === trusted.reviewerId ||
-            trusted.validated !== true) return false;
+            trusted.confirmedOutcome !== input.outcome) return false;
+        if (trusted.validated) {
+          if (trusted.operatorId !== input.operatorId ||
+              trusted.reviewerId !== input.reviewerId ||
+              trusted.operatorId === trusted.reviewerId) return false;
+        } else {
+          // Pending mock evidence is usable only with two immutable
+          // independently authenticated attribution events.
+          if (trusted.provider !== 'MOCK') return false;
+          const attributions = await tx.integrationEvidenceAttribution.findMany({
+            where: { evidenceId: input.trustedEvidenceId, admissionId: input.admissionId },
+            select: { action: true, actorUserId: true, sessionHash: true },
+          });
+          const attestor = attributions.find(event =>
+            event.action === 'ATTEST' && event.actorUserId === input.operatorId);
+          const reviewer = attributions.find(event =>
+            event.action === 'REVIEW' && event.actorUserId === input.reviewerId);
+          if (!attestor || !reviewer ||
+              attestor.actorUserId === reviewer.actorUserId ||
+              attestor.sessionHash === reviewer.sessionHash) return false;
+        }
         // Resolve operator identities from current database users rather than
         // trusting caller-declared roles. This is not session authentication.
         const approvers = await tx.user.findMany({
