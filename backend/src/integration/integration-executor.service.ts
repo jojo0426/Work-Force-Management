@@ -130,7 +130,7 @@ export class IntegrationExecutorService {
     let adapterResult: IntegrationAdapterResult;
     const invokeAdapter = async (): Promise<IntegrationAdapterResult> => {
       if (executionTimeoutMs === null) {
-        adapterResult = await adapter({ ...context, targetSystem });
+        return await adapter({ ...context, targetSystem });
       } else {
         const controller = new AbortController();
         const timeoutMs = executionTimeoutMs;
@@ -146,7 +146,7 @@ export class IntegrationExecutorService {
           }, timeoutMs);
         });
         try {
-          adapterResult = await Promise.race([
+          return await Promise.race([
             Promise.resolve(adapter({ ...context, targetSystem, signal: controller.signal })),
             timeout,
           ]);
