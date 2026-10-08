@@ -25,6 +25,9 @@ async function main(): Promise<void> {
         reviewerId: 'reviewer-2', validated: true,
       }),
     },
+    user: { findMany: async () => [
+      { id: 'operator-1' }, { id: 'reviewer-2' },
+    ] },
     integrationReconciliationAudit: {
       create: async () => { writes += 1; },
     },
