@@ -218,6 +218,13 @@ export class IntegrationFleetControlService {
         select: { id: true },
       });
       if (!job) return { admitted: false };
+      // Record the dispatch boundary in the transaction. The earlier durable
+      // MAY_HAVE_DISPATCHED marker remains even if this transaction rolls back.
+      const marked = await tx.integrationAdmission.updateMany({
+        where: { id: admissionId, jobId, claimToken, status: 'MAY_HAVE_DISPATCHED' },
+        data: { status: 'IN_FLIGHT' },
+      });
+      if (marked.count !== 1) return { admitted: false };
       const result = await callback();
       // Do not erase the committed marker on rollback/timeout.
       return { admitted: true, result };
@@ -234,7 +241,7 @@ export class IntegrationFleetControlService {
     });
     if (!completed || completed.status !== 'COMPLETED' || completed.claimToken !== null) return 0;
     const settled = await this.prisma.integrationAdmission.updateMany({
-      where: { jobId, claimToken, status: 'MAY_HAVE_DISPATCHED' },
+      where: { jobId, claimToken, status: { in: ['MAY_HAVE_DISPATCHED', 'IN_FLIGHT'] } },
       data: { status: 'SETTLED', releasedAt: new Date() },
     });
     return settled.count;
