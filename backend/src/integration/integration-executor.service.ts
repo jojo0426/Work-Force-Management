@@ -5,6 +5,7 @@ import { IntegrationFleetControlService } from './integration-fleet-control.serv
 
 export type IntegrationExecutionContext = {
   jobId: string;
+  claimToken?: string;
   sourceSystem: string;
   targetSystem: string;
   payload: unknown;
@@ -127,7 +128,7 @@ export class IntegrationExecutorService {
     }
 
     let adapterResult: IntegrationAdapterResult;
-    try {
+    const invokeAdapter = async (): Promise<IntegrationAdapterResult> => {
       if (executionTimeoutMs === null) {
         adapterResult = await adapter({ ...context, targetSystem });
       } else {
@@ -152,6 +153,21 @@ export class IntegrationExecutorService {
         } finally {
           if (timer) clearTimeout(timer);
         }
+      }
+    };
+    try {
+      if (this.fleet) {
+        // No direct/unclaimed adapter calls in a wired fleet.
+        if (!context.claimToken) {
+          return { status: 'BLOCKED', targetSystem, reason: 'FLEET_STOPPED', externalActionsExecuted: false };
+        }
+        const fenced = await this.fleet.withFencedDispatch(context.jobId, context.claimToken, invokeAdapter);
+        if (!fenced.admitted) {
+          return { status: 'BLOCKED', targetSystem, reason: 'FLEET_STOPPED', externalActionsExecuted: false };
+        }
+        adapterResult = fenced.result;
+      } else {
+        adapterResult = await invokeAdapter();
       }
     } catch (error) {
       const classified = error instanceof IntegrationExecutionError
