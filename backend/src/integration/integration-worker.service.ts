@@ -30,7 +30,7 @@ export class IntegrationWorkerService {
     const normalizedTarget = String(target || '').trim().toUpperCase();
     this.registerHandler(normalizedTarget, async (_payload, job) => {
       if (!this.executor) throw new Error('Integration executor is not available');
-      const result = await this.executor.execute({ jobId: job.id, sourceSystem: String(job.sourceSystem || ''), targetSystem: normalizedTarget, payload: job.payload });
+      const result = await this.executor.execute({ jobId: job.id, claimToken: job.claimToken, sourceSystem: String(job.sourceSystem || ''), targetSystem: normalizedTarget, payload: job.payload });
       if (result.status !== 'EXECUTED') throw new Error(`Integration executor blocked ${normalizedTarget}: ${result.reason}`);
       return { externalActionsExecuted: result.externalActionsExecuted };
     });
