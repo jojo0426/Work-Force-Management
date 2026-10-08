@@ -41,7 +41,10 @@ export class IntegrationMockReceiptIngestionService {
         if (!admission || !['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN']
           .includes(admission.status)) return { accepted: false, evidenceId: null };
         const job = await tx.integrationJob.findUnique({ where: { id: admission.jobId } });
-        if (!job || job.targetSystem !== 'MOCK' || job.status === 'PROCESSING') {
+        if (!job || job.targetSystem !== 'MOCK' || job.status === 'PROCESSING' ||
+            !job.payload || typeof job.payload !== 'object' ||
+            Array.isArray(job.payload) ||
+            (job.payload as Record<string, unknown>).mockRequestId !== input.receipt.requestId) {
           return { accepted: false, evidenceId: null };
         }
         // Do not trust a caller's claim that this receipt belongs to a job:
