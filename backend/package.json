@@ -58,7 +58,8 @@
         "test:phase5c-database": "npm run test:integration-queue-database-e2e && npm run test:integration-worker-database-e2e && npm run test:integration-worker-concurrency-database-e2e && npm run test:integration-stale-claim-database-e2e && npm run test:integration-worker-crash-recovery-database-e2e && npm run test:integration-orchestrator-database-e2e && npm run test:integration-executor-database-e2e && npm run test:integration-executor-concurrency-database-e2e && npm run test:integration-executor-retry-exhaustion-database-e2e && npm run test:integration-executor-timeout-database-e2e && npm run test:integration-classification-retry-database-e2e",
         "test:phase5d-config": "ts-node src/integration/integration-configuration-preflight-selftest.ts",
         "test:phase5d-sandbox": "ts-node src/integration/provider-sandbox-connectivity-selftest.ts",
-        "test:phase5d-faults": "ts-node src/integration/provider-sandbox-advanced-faults-selftest.ts"
+        "test:phase5d-faults": "ts-node src/integration/provider-sandbox-advanced-faults-selftest.ts",
+        "test:phase5d-monitoring": "ts-node src/integration/integration-health-metrics-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
