@@ -10,48 +10,15 @@ import { PrismaService } from '../prisma.service';
 export class IntegrationWorkerMembershipService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async register(workerId: string, instanceToken: string, generation: bigint): Promise<boolean> {
-    if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) ||
-        instanceToken.length < 32 || !/^[A-Za-z0-9_-]+$/.test(instanceToken) ||
-        generation < 0n) return false;
-    try {
-      return await this.prisma.$transaction(async tx => {
-        const rows = await tx.$queryRaw<Array<{ enabled: boolean; generation: bigint }>>`
-          SELECT "enabled", "generation" FROM "IntegrationFleetControl"
-          WHERE "id" = 'GLOBAL' FOR UPDATE
-        `;
-        if (rows.length !== 1 || rows[0].generation !== generation) return false;
-        // No upsert: an existing worker identity must not be silently
-        // overwritten by a restarted process without controller approval.
-        const existing = await tx.integrationWorkerMembership.findUnique({
-          where: { workerId }, select: { workerId: true },
-        });
-        if (existing) return false;
-        await tx.integrationWorkerMembership.create({
-          data: { workerId, instanceToken, generation },
-        });
-        return true;
-      });
-    } catch { return false; }
+  /** Legacy untrusted registration and acknowledgment paths disabled.
+   * Only IntegrationTrustedWorkerService may issue new membership records.
+   */
+  async register(_workerId: string, _instanceToken: string, _generation: bigint): Promise<boolean> {
+    return false;
   }
 
-  async acknowledgeStop(workerId: string, instanceToken: string, generation: bigint): Promise<boolean> {
-    if (!workerId || !instanceToken || generation < 0n) return false;
-    try {
-      return await this.prisma.$transaction(async tx => {
-        const rows = await tx.$queryRaw<Array<{ enabled: boolean; generation: bigint }>>`
-          SELECT "enabled", "generation" FROM "IntegrationFleetControl"
-          WHERE "id" = 'GLOBAL' FOR UPDATE
-        `;
-        if (rows.length !== 1 || rows[0].enabled || rows[0].generation !== generation) return false;
-        const updated = await tx.integrationWorkerMembership.updateMany({
-          where: { workerId, instanceToken, stopAckGeneration: null,
-            generation: { lt: generation } },
-          data: { stopAckGeneration: generation, stopAckAt: new Date(), lastSeenAt: new Date() },
-        });
-        return updated.count === 1;
-      });
-    } catch { return false; }
+  async acknowledgeStop(_workerId: string, _instanceToken: string, _generation: bigint): Promise<boolean> {
+    return false;
   }
 
   async inspectStoppedFleet(expectedWorkerIds: readonly string[]): Promise<{
