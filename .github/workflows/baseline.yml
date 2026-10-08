@@ -90,6 +90,8 @@ jobs:
         run: npm run test:phase5e-reconciliation
       - name: Run Phase 5E drain status regression
         run: npm run test:phase5e-drain
+      - name: Run Phase 5E strict stop safety regression
+        run: npm run test:phase5e-stop-safety
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
