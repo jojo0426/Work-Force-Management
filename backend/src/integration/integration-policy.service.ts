@@ -70,6 +70,10 @@ export class IntegrationPolicyService {
     if (!Number.isSafeInteger(parsed) || parsed <= 0) {
       throw new Error(`${name} must be a positive safe integer`);
     }
+    const maximum = name === 'INTEGRATION_EXECUTION_TIMEOUT_MS' ? 300_000 : 86_400_000;
+    if (parsed > maximum) {
+      throw new Error(`${name} exceeds the allowed maximum of ${maximum}ms`);
+    }
     return parsed;
   }
 
@@ -77,7 +81,7 @@ export class IntegrationPolicyService {
     const normalized = String(target || '').trim().toUpperCase();
     if (!normalized) throw new Error('Integration target is required');
     if (!/^[A-Z0-9][A-Z0-9_-]*$/.test(normalized)) {
-      throw new Error(`Invalid integration target ${normalized}`);
+      throw new Error('Invalid integration target');
     }
     return normalized;
   }
