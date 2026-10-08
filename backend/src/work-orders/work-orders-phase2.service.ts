@@ -18,8 +18,8 @@ export class WorkOrdersPhase2Service {
     const remaining = await this.prisma.workOrder.findMany({
       where: { status: 'ASSIGNED', assignments: { some: { teamId: technician.teamId } } },
       include: { assignments: true },
-      take: 50,
-      orderBy: { createdAt: 'asc' }
+      take: 100,
+      orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }]
     });
 
     const subscriberIds = remaining.map((wo) => wo.subscriberId).filter((id): id is string => Boolean(id));
@@ -30,21 +30,42 @@ export class WorkOrdersPhase2Service {
       if (!wo.subscriberId) return [];
       const subscriber = subscriberById.get(wo.subscriberId);
       if (!subscriber || subscriber.lat == null || subscriber.lng == null) return [];
+      const distance_m = Math.round(this.haversine(currentLat, currentLng, subscriber.lat, subscriber.lng));
       return [{
         woNumber: wo.woNumber,
         id: wo.id,
         type: wo.type,
+        status: wo.status,
         priority: wo.priority,
-        subscriber: { accountNumber: subscriber.accountNumber, name: subscriber.name, address: subscriber.address },
-        distance_m: Math.round(this.haversine(currentLat, currentLng, subscriber.lat, subscriber.lng))
+        subscriber: {
+          accountNumber: subscriber.accountNumber,
+          name: subscriber.name,
+          address: subscriber.address,
+          lat: subscriber.lat,
+          lng: subscriber.lng,
+          napId: subscriber.napId
+        },
+        distance_m,
+        distance_km: Number((distance_m / 1000).toFixed(2))
       }];
-    }).sort((a, b) => a.distance_m - b.distance_m || a.priority - b.priority);
+    }).sort((a, b) => a.distance_m - b.distance_m || a.priority - b.priority || a.woNumber.localeCompare(b.woNumber));
 
     return {
-      suggestions: withDistance.slice(0, 5),
-      recommended: withDistance[0] || null,
+      technician: {
+        id: technician.id,
+        name: technician.name,
+        teamId: technician.teamId,
+        status: technician.status,
+        lat: currentLat,
+        lng: currentLng
+      },
+      candidatesConsidered: remaining.length,
+      suggestions: withDistance.slice(0, 10).map((item, index) => ({ ...item, sequence: index + 1 })),
+      recommended: withDistance.length ? { ...withDistance[0], sequence: 1 } : null,
       excludedWithoutVerifiedLocation: remaining.length - withDistance.length,
-      message: 'Suggestion only — based on real GPS and the technician team assignment. No automatic rearrangement or assignment is performed.'
+      advisoryOnly: true,
+      requiresManagementApproval: true,
+      message: 'Suggestion only — nearest eligible assigned service orders are sequenced from the technician current GPS. No work order is automatically reordered, reassigned, or started.'
     };
   }
 

@@ -328,15 +328,27 @@ model NetworkAlert {
 }
 
 model IntegrationJob {
-  id           String    @id @default(uuid())
-  sourceSystem String
-  targetSystem String?
-  payload      Json
-  status       String    @default("PENDING")
-  retries      Int       @default(0)
-  lastError    String?
-  createdAt    DateTime  @default(now())
-  processedAt  DateTime?
+  id             String    @id @default(uuid())
+  sourceSystem   String
+  targetSystem   String?
+  payload        Json
+  status         String    @default("PENDING")
+  idempotencyKey String?
+  retries        Int       @default(0)
+  maxRetries     Int       @default(5)
+  nextAttemptAt  DateTime  @default(now())
+  claimedAt      DateTime?
+  claimToken     String?
+  lastAttemptAt  DateTime?
+  lastError      String?
+  completedAt    DateTime?
+  failedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  processedAt    DateTime?
+
+  @@unique([sourceSystem, idempotencyKey])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([claimToken])
 }
 
 model Transfer {
