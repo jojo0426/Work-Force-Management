@@ -63,10 +63,12 @@ export class IntegrationFleetControlService {
   }
 
   /**
-   * Experimental bounded dispatch fence. The singleton row lock remains held
-   * until the callback settles, so stopFleet cannot acknowledge while the
-   * callback is starting/running. Never use for real providers before
-   * uncertain-outcome reconciliation and timeout/drain acceptance.
+   * Phase 5E.2G: commit a durable MAY_HAVE_DISPATCHED marker BEFORE any adapter
+   * invocation. Then acquire a second row lock for the actual callback.
+   * Failure of either transaction never erases the committed marker.
+   *
+   * Still experimental: a lost DB connection/timeout may release the row lock
+   * while an external provider operation remains active.
    */
   async withFencedDispatch<T>(
     jobId: string,
@@ -74,28 +76,50 @@ export class IntegrationFleetControlService {
     callback: () => Promise<T>,
   ): Promise<{ admitted: boolean; result?: T }> {
     if (!jobId || !claimToken) return { admitted: false };
+    const admissionId = randomUUID();
+    const prepared = await this.prisma.$transaction(async tx => {
+      const rows = await tx.$queryRaw<Array<{ enabled: boolean; generation: bigint }>>`
+        SELECT "enabled", "generation" FROM "IntegrationFleetControl"
+        WHERE "id" = 'GLOBAL' FOR UPDATE
+      `;
+      if (rows.length !== 1 || rows[0].enabled !== true) return false;
+      const job = await tx.integrationJob.findFirst({
+        where: { id: jobId, claimToken, status: 'PROCESSING' },
+        select: { id: true },
+      });
+      if (!job) return false;
+      await tx.integrationAdmission.create({
+        data: {
+          id: admissionId, jobId, claimToken, generation: rows[0].generation,
+          status: 'MAY_HAVE_DISPATCHED',
+        },
+      });
+      return true;
+    }, { maxWait: 5_000, timeout: 10_000 });
+    if (!prepared) return { admitted: false };
+
+    // The marker is committed. Even if stop wins this second lock, keep the
+    // marker for conservative manual reconciliation rather than auto-retry.
     return this.prisma.$transaction(async tx => {
       const rows = await tx.$queryRaw<Array<{ enabled: boolean; generation: bigint }>>`
         SELECT "enabled", "generation" FROM "IntegrationFleetControl"
         WHERE "id" = 'GLOBAL' FOR UPDATE
       `;
-      if (rows.length !== 1 || rows[0].enabled !== true) return { admitted: false };
+      const marker = await tx.integrationAdmission.findUnique({
+        where: { id: admissionId },
+        select: { generation: true },
+      });
+      if (rows.length !== 1 || rows[0].enabled !== true ||
+          !marker || marker.generation !== rows[0].generation) {
+        return { admitted: false };
+      }
       const job = await tx.integrationJob.findFirst({
         where: { id: jobId, claimToken, status: 'PROCESSING' },
         select: { id: true },
       });
       if (!job) return { admitted: false };
-      const admissionId = randomUUID();
-      await tx.integrationAdmission.create({
-        data: { id: admissionId, jobId, claimToken, generation: rows[0].generation, status: 'ADMITTED' },
-      });
-      // This awaits the full adapter operation while retaining the row lock.
-      // Timeout/connection loss can still leave external effects ambiguous.
       const result = await callback();
-      await tx.integrationAdmission.update({
-        where: { id: admissionId },
-        data: { status: 'SETTLED', releasedAt: new Date() },
-      });
+      // Do not erase the committed marker on rollback/timeout.
       return { admitted: true, result };
     }, { maxWait: 5_000, timeout: 30_000 });
   }
