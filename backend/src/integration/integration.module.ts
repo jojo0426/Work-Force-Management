@@ -10,11 +10,12 @@ import { IntegrationFleetControlService } from './integration-fleet-control.serv
 import { IntegrationHealthMetricsService } from './integration-health-metrics.service';
 import { IntegrationAdapterRegistryService } from './integration-adapter-registry.service';
 import { IntegrationAdapterLifecycleService } from './integration-adapter-lifecycle.service';
+import { IntegrationMockKeyVerifierService } from './integration-mock-key-verifier.service';
 import { IntegrationMockReceiptIngestionService } from './integration-mock-receipt-ingestion.service';
 import { IntegrationApprovalLedgerService } from './integration-approval-ledger.service';
 import { IntegrationReconciliationService } from './integration-reconciliation.service';
 import { PrismaService } from '../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 
-@Module({ imports: [AuthModule], controllers: [IntegrationController, IntegrationApprovalController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationFleetControlService, IntegrationReconciliationService, IntegrationApprovalLedgerService, IntegrationMockReceiptIngestionService, IntegrationHealthMetricsService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
+@Module({ imports: [AuthModule], controllers: [IntegrationController, IntegrationApprovalController], providers: [IntegrationService, IntegrationWorkerService, IntegrationOrchestratorService, IntegrationExecutorService, IntegrationPolicyService, IntegrationFleetControlService, IntegrationReconciliationService, IntegrationApprovalLedgerService, IntegrationMockReceiptIngestionService, IntegrationMockKeyVerifierService, IntegrationHealthMetricsService, IntegrationAdapterRegistryService, IntegrationAdapterLifecycleService, PrismaService] })
 export class IntegrationModule {}
