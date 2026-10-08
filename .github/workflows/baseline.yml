@@ -82,6 +82,8 @@ jobs:
         run: npm run test:phase5e-fleet-foundation
       - name: Run Phase 5E fleet stop reservation mock selftest
         run: npm run test:phase5e-fleet-stop
+      - name: Run Phase 5E shared fleet wiring selftest
+        run: npm run test:phase5e-fleet-wiring
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
