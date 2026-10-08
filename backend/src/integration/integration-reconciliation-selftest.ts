@@ -17,6 +17,14 @@ async function main(): Promise<void> {
         : [{ id: 'admission-1', jobId: 'job-1', status }];
     },
     integrationJob: { findUnique: async () => ({ status: 'RECONCILIATION_REQUIRED' }) },
+    integrationProviderEvidence: {
+      findUnique: async () => ({
+        admissionId: 'admission-1', provider: 'MOCK',
+        providerRequestId: 'provider-request-1', evidenceRef: 'evidence/ref-123',
+        confirmedOutcome: 'CONFIRMED_NOT_APPLIED', operatorId: 'operator-1',
+        reviewerId: 'reviewer-2', validated: true,
+      }),
+    },
     integrationReconciliationAudit: {
       create: async () => { writes += 1; },
     },
@@ -29,7 +37,8 @@ async function main(): Promise<void> {
     admissionId: 'admission-1', operatorId: 'operator-1',
     reviewerId: 'reviewer-2', provider: 'MOCK',
     providerRequestId: 'provider-request-1', outcome: 'CONFIRMED_NOT_APPLIED',
-    evidenceRef: 'evidence/ref-123', reasonCode: 'PROVIDER_LOOKUP',
+    evidenceRef: 'evidence/ref-123', trustedEvidenceId: 'registry-evidence-1',
+    reasonCode: 'PROVIDER_LOOKUP',
     providerEvidence: {
       provider: 'MOCK', supportsIdempotency: true,
       supportsStatusLookup: true, idempotencyRetentionSeconds: 3600,
