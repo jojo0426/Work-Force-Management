@@ -8,6 +8,7 @@ async function main(): Promise<void> {
   let writes = 0;
   let calls = 0;
   let status = 'UNCERTAIN';
+  let approversEnabled = true;
   const db: any = {
     $transaction: async (fn: (tx: any) => Promise<boolean>) => fn(db),
     $queryRaw: async () => {
@@ -25,9 +26,9 @@ async function main(): Promise<void> {
         reviewerId: 'reviewer-2', validated: true,
       }),
     },
-    user: { findMany: async () => [
-      { id: 'operator-1' }, { id: 'reviewer-2' },
-    ] },
+    user: { findMany: async () => approversEnabled
+      ? [{ id: 'operator-1' }, { id: 'reviewer-2' }]
+      : [{ id: 'operator-1' }] },
     integrationReconciliationAudit: {
       create: async () => { writes += 1; },
     },
@@ -54,6 +55,10 @@ async function main(): Promise<void> {
     !(await svc.resolveWithEvidence({
       ...request, providerEvidence: { ...request.providerEvidence, validatedInSandbox: false },
     })) && writes === 0);
+  approversEnabled = false;
+  check('missing active reviewer denies reconciliation',
+    !(await svc.resolveWithEvidence(request)) && writes === 0);
+  approversEnabled = true;
   check('complete evidence allows one atomic resolution',
     await svc.resolveWithEvidence(request) && writes === 1 && status === 'RECONCILED');
   check('repeated resolution rejected', !(await svc.resolveWithEvidence(request)) && writes === 1);
