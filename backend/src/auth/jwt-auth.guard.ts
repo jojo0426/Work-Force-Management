@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma.service';
@@ -20,6 +21,9 @@ export class JwtAuthGuard implements CanActivate {
       const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
       if (!user || !user.isActive) throw new UnauthorizedException('Account unavailable');
 
+      // Derive approval session binding from the verified bearer token.
+      // Do not expose or persist the raw credential.
+      request.authSessionHash = createHash('sha256').update(token).digest('hex');
       request.user = {
         id: user.id,
         email: user.email,
