@@ -35,13 +35,26 @@ export class IntegrationApprovalLedgerService {
         const evidence = await tx.integrationProviderEvidence.findUnique({
           where: { id: evidenceId },
         });
-        if (!evidence || !evidence.validated || evidence.admissionId !== admissionId) return false;
-        if (action === 'PROPOSE' && evidence.operatorId !== actor.userId) return false;
+        if (!evidence || evidence.admissionId !== admissionId) return false;
+        if (!evidence.validated) {
+          if (evidence.provider !== 'MOCK') return false;
+          const attribution = await tx.integrationEvidenceAttribution.findMany({
+            where: { evidenceId, admissionId },
+            select: { action: true, actorUserId: true, sessionHash: true },
+          });
+          const attestor = attribution.find(event => event.action === 'ATTEST');
+          const reviewer = attribution.find(event => event.action === 'REVIEW');
+          if (!attestor || !reviewer || attestor.actorUserId === reviewer.actorUserId ||
+              attestor.sessionHash === reviewer.sessionHash) return false;
+          if (action === 'PROPOSE' && actor.userId !== attestor.actorUserId) return false;
+          if (action === 'APPROVE' && actor.userId !== reviewer.actorUserId) return false;
+        }
+        if (action === 'PROPOSE' && evidence.validated && evidence.operatorId !== actor.userId) return false;
         if (action === 'APPROVE') {
-          if (evidence.reviewerId !== actor.userId) return false;
+          if (evidence.validated && evidence.reviewerId !== actor.userId) return false;
           const proposal = await tx.integrationApprovalEvent.findFirst({
             where: { admissionId, evidenceId, action: 'PROPOSE',
-              actorUserId: evidence.operatorId },
+              actorUserId: evidence.validated ? evidence.operatorId : undefined },
           });
           if (!proposal || proposal.actorUserId === actor.userId) return false;
         }
