@@ -133,6 +133,15 @@ async function main(): Promise<void> {
     check('stop reports admissions closed, not external drain',
       protocol.acknowledged && !protocol.externallyDrained &&
       protocol.unresolvedAttempts !== null && protocol.unresolvedAttempts > 0);
+    const preparedAfterStop = await db.integrationAdmission.findFirst({
+      where: { jobId: claim!.id, status: 'MAY_HAVE_DISPATCHED' },
+    });
+    if (preparedAfterStop) {
+      const authorized = await control.authorizeDispatchStart(
+        preparedAfterStop.id, claim!.id, claim!.claimToken!,
+      );
+      check('post-stop start barrier rejects prepared attempt', !authorized);
+    }
     const after = await control.reserveAdmission(claim!.id, claim!.claimToken!);
     check('post-stop admission is blocked', !after.admitted);
     const row = await db.integrationFleetControl.findUnique({ where: { id: 'GLOBAL' } });
