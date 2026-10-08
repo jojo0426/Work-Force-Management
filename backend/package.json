@@ -59,7 +59,8 @@
         "test:phase5d-config": "ts-node src/integration/integration-configuration-preflight-selftest.ts",
         "test:phase5d-sandbox": "ts-node src/integration/provider-sandbox-connectivity-selftest.ts",
         "test:phase5d-faults": "ts-node src/integration/provider-sandbox-advanced-faults-selftest.ts",
-        "test:phase5d-monitoring": "ts-node src/integration/integration-health-metrics-selftest.ts"
+        "test:phase5d-monitoring": "ts-node src/integration/integration-health-metrics-selftest.ts",
+        "test:phase5d-monitoring-wiring": "ts-node src/integration/integration-health-wiring-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
