@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { IntegrationFleetControlService } from './integration-fleet-control.service';
 import { IntegrationService } from './integration.service';
 import { IntegrationWorkerService } from './integration-worker.service';
 
@@ -21,6 +22,7 @@ export class IntegrationOrchestratorService {
   constructor(
     private readonly integration: IntegrationService,
     private readonly worker: IntegrationWorkerService,
+    @Optional() private readonly fleet?: IntegrationFleetControlService,
   ) {}
 
   /**
@@ -49,6 +51,9 @@ export class IntegrationOrchestratorService {
 
     this.running = true;
     try {
+      if (this.fleet && !(await this.fleet.inspectGate()).allowed) {
+        return { status: 'IDLE', recovery: null, worker: null, externalActionsExecuted: false };
+      }
       const leaseMs = options.leaseMs ?? 5 * 60_000;
       const retryDelayMs = options.retryDelayMs ?? 30_000;
       const recoveryTake = options.recoveryTake ?? 10;
