@@ -80,6 +80,8 @@ jobs:
         run: npm run test:phase5e-provider
       - name: Run Phase 5E fleet control foundation selftest
         run: npm run test:phase5e-fleet-foundation
+      - name: Run Phase 5E fleet stop reservation mock selftest
+        run: npm run test:phase5e-fleet-stop
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
