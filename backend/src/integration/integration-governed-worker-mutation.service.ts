@@ -25,6 +25,10 @@ export class IntegrationGovernedWorkerMutationService {
   async applyAuthenticated(workerId: string, operation: GovernanceOperation,
     envelope: string, signingKey: string, nowSeconds: number,
     secret?: string, requestId?: string): Promise<boolean> {
+    // Synthetic identity is restricted to explicit isolated CI fixture runs.
+    if (process.env.GITHUB_ACTIONS !== 'true' ||
+        process.env.WFM_SYNTHETIC_GOVERNANCE_FIXTURE !== 'true' ||
+        !/\\/wfm_ci(?:\\?|$)/.test(process.env.DATABASE_URL || '')) return false;
     if (requestId !== undefined && !/^[A-Za-z0-9_-]{16,100}$/.test(requestId)) return false;
     const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
     if (!actor) return false;
