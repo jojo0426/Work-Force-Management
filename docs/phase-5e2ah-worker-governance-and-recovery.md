@@ -20,3 +20,10 @@
 ## Acceptance decision
 
 **Phase 5E.2AH partial / G1 OPEN / production NO-GO.** Do not claim that authenticated governance, credential migration or real crash validation is finished. Do not merge, deploy or activate providers.
+
+## Continuation: transactional governed roster mutation (prototype)
+
+Added `IntegrationGovernedWorkerMutationService.apply` with stopped-fleet row locking and an operation-specific independent PROPOSE/APPROVE pair in the **same database transaction** as worker ENROLL or RETIRE. The reviewer identity must match the requested executor; ENROLL refuses existing IDs, RETIRE checks unresolved admissions and active attempts. The isolated two-connection PostgreSQL regression checks missing approval, proposal-only denial, wrong reviewer, single-winner enrollment concurrency, operation separation and retirement replay prevention.
+
+**Critical limitation:** The older `IntegrationTrustedWorkerService.enroll` and `retire` methods are **still callable** and bypass this new governance service. This is an additional gated prototype, not complete enforcement across every roster mutation path. Also the governance actors are still caller-asserted rather than verified sessions, approvals are not consumed per operation instance, and no real crash test or credential migration has been performed. The production gate remains NO-GO.
+
