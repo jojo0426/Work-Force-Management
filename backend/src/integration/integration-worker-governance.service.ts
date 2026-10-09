@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { PrismaService } from '../prisma.service';
 import { verifyGovernanceSession } from './integration-governance-session';
 import { governancePayloadDigest } from './integration-governance-payload';
+import { TrustedIssuerConfig, verifyTrustedGovernanceJwt } from './integration-trusted-governance-issuer';
 
 export type GovernanceAction = 'PROPOSE' | 'APPROVE';
 export type GovernanceOperation = 'ENROLL' | 'RETIRE' | 'ROTATE';
@@ -30,6 +31,22 @@ export class IntegrationWorkerGovernanceService {
       createHash('sha256').update('ROTATE:' + workerId).digest('hex') :
       governancePayloadDigest(workerId, operation, credentialHash);
     if (!digest || !requestId || !/^[A-Za-z0-9_-]{16,100}$/.test(requestId)) return false;
+    return this.recordVerified(workerId, operation, action, actor, digest, requestId);
+  }
+
+  /**
+   * Trusted-key cutover prototype. No HTTP controller or live issuer is configured.
+   * Issuer config must be injected by an authenticated deployment controller.
+   */
+  async recordTrustedIssuer(workerId: string, operation: GovernanceOperation,
+    action: GovernanceAction, jwt: string, issuer: TrustedIssuerConfig,
+    nowSeconds: number, requestId: string, credentialHash?: string): Promise<boolean> {
+    const actor = verifyTrustedGovernanceJwt(jwt, issuer, nowSeconds);
+    if (!actor || !/^[A-Za-z0-9_-]{16,100}$/.test(requestId)) return false;
+    const digest = operation === 'ROTATE' ?
+      createHash('sha256').update('ROTATE:' + workerId).digest('hex') :
+      governancePayloadDigest(workerId, operation, credentialHash);
+    if (!digest) return false;
     return this.recordVerified(workerId, operation, action, actor, digest, requestId);
   }
 
