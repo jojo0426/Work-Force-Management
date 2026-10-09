@@ -104,6 +104,8 @@ jobs:
         run: npm run test:phase5e-governed-worker-mutation-database
       - name: Run Phase 5E.2AI payload-bound governance contract
         run: npm run test:phase5e-governance-payload
+      - name: Run Phase 5E.2AI request correlation and credential inventory PostgreSQL E2E
+        run: npm run test:phase5e-governance-request-database
       - name: Run Phase 5E reconciliation quarantine regression
         run: npm run test:phase5e-reconciliation
       - name: Run Phase 5E drain status regression
