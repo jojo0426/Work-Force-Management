@@ -395,9 +395,11 @@ model IntegrationWorkerGovernanceEvent {
   actorId     String
   sessionHash String
   payloadDigest String?
+  requestId   String?
   createdAt   DateTime @default(now())
   @@unique([workerId, operation, actorId, action])
   @@index([workerId, operation, action])
+  @@index([requestId, action])
 }
 
 // Phase 5E.2AH: one-time approval consumption, never reusable.
