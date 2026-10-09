@@ -97,7 +97,8 @@
         "test:phase5e-trusted-governance-database": "ts-node src/integration/integration-trusted-governance-database-e2e.ts",
         "test:phase5e-worker-sigkill-database": "ts-node src/integration/integration-worker-sigkill-database-e2e.ts",
         "test:phase5e-multireplica-inflight-fence": "ts-node src/integration/integration-multireplica-inflight-fence-selftest.ts",
-        "test:phase5e-inflight-sigkill-database": "ts-node src/integration/integration-inflight-sigkill-database-e2e.ts"
+        "test:phase5e-inflight-sigkill-database": "ts-node src/integration/integration-inflight-sigkill-database-e2e.ts",
+        "test:phase5e-external-dispatch-gate": "ts-node src/integration/integration-external-dispatch-gate-selftest.ts && ts-node src/integration/integration-external-gate-isolation-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
