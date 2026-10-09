@@ -1,0 +1,21 @@
+import { strict as assert } from 'assert';
+import { createHash } from 'crypto';
+import { governancePayloadDigest } from './integration-governance-payload';
+import { verifyGovernanceSession } from './integration-governance-session';
+import { CI_GOVERNANCE_KEY, CI_NOW, syntheticGovernanceSession } from './integration-governance-session-test-fixture';
+
+const id = 'worker_payload_test';
+const secretHash = createHash('sha256').update('synthetic-credential-1').digest('hex');
+const alternateHash = createHash('sha256').update('synthetic-credential-2').digest('hex');
+const original = governancePayloadDigest(id, 'ENROLL', secretHash);
+assert.ok(original);
+assert.notEqual(original, governancePayloadDigest(id, 'ENROLL', alternateHash));
+assert.notEqual(original, governancePayloadDigest(id, 'RETIRE'));
+assert.equal(governancePayloadDigest(id, 'ENROLL', undefined), null);
+assert.equal(governancePayloadDigest(id, 'RETIRE', secretHash), null);
+const session = syntheticGovernanceSession('ci_reviewer', 'unique-session-123456789');
+assert.equal(verifyGovernanceSession(session, CI_GOVERNANCE_KEY, CI_NOW)?.actorId, 'ci_reviewer');
+assert.equal(verifyGovernanceSession(session, 'wrong-key-with-sufficient-length-1234567890', CI_NOW), null);
+assert.equal(verifyGovernanceSession(session, CI_GOVERNANCE_KEY, CI_NOW + 1000), null);
+assert.equal(verifyGovernanceSession(syntheticGovernanceSession('ci_reviewer', 'unique-session-123456789', { role: 'VIEWER' }), CI_GOVERNANCE_KEY, CI_NOW), null);
+console.log('Phase 5E.2AI payload and synthetic session contract passed.');
