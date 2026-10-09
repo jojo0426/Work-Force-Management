@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { CI_GOVERNANCE_KEY, CI_NOW, syntheticGovernanceSession } from './integration-governance-session-test-fixture';
 import { IntegrationWorkerGovernanceService } from './integration-worker-governance.service';
 
 function check(label: string, ok: boolean): void {
@@ -24,18 +25,18 @@ async function main(): Promise<void> {
       update: { enabled: false },
     });
     check('review before proposal denied',
-      !(await svcB.record(id, 'ROTATE', 'APPROVE', bob)));
+      !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
     check('unprivileged proposal denied',
-      !(await svcA.record(id, 'ROTATE', 'PROPOSE', { ...alice, privileged: false })));
+      !(await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', { ...alice, privileged: false })));
     check('first independent proposal accepted',
-      await svcA.record(id, 'ROTATE', 'PROPOSE', alice));
+      await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     check('same actor cannot approve',
-      !(await svcA.record(id, 'ROTATE', 'APPROVE', alice)));
+      !(await svcA.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
     check('same session cannot approve under different actor',
-      !(await svcB.record(id, 'ROTATE', 'APPROVE', { ...bob, sessionHash: alice.sessionHash })));
+      !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', { ...bob, sessionHash: alice.sessionHash })));
     const concurrent = await Promise.all([
-      svcA.record(id, 'ROTATE', 'APPROVE', bob),
-      svcB.record(id, 'ROTATE', 'APPROVE', bob),
+      svcA.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW),
+      svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW),
     ]);
     check('concurrent review exactly one winner', concurrent.filter(Boolean).length === 1);
     check('independent approval persists across database connections',
