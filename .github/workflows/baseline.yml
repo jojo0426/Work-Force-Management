@@ -100,6 +100,8 @@ jobs:
         run: npm run test:phase5e-worker-restart-database
       - name: Run Phase 5E.2AH worker governance PostgreSQL E2E
         run: npm run test:phase5e-worker-governance-database
+      - name: Run Phase 5E.2AH governed roster mutation PostgreSQL E2E
+        run: npm run test:phase5e-governed-worker-mutation-database
       - name: Run Phase 5E reconciliation quarantine regression
         run: npm run test:phase5e-reconciliation
       - name: Run Phase 5E drain status regression
