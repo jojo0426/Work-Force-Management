@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma.service';
 import { verifyGovernanceSession } from './integration-governance-session';
 import { governancePayloadDigest } from './integration-governance-payload';
@@ -25,7 +26,8 @@ export class IntegrationWorkerGovernanceService {
     nowSeconds: number, credentialHash?: string): Promise<boolean> {
     const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
     if (!actor) return false;
-    const digest = operation === 'ROTATE' ? null :
+    const digest = operation === 'ROTATE' ?
+      createHash('sha256').update('ROTATE:' + workerId).digest('hex') :
       governancePayloadDigest(workerId, operation, credentialHash);
     if (!digest) return false;
     return this.recordVerified(workerId, operation, action, actor, digest);
