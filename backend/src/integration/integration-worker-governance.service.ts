@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { verifyGovernanceSession } from './integration-governance-session';
 
 export type GovernanceAction = 'PROPOSE' | 'APPROVE';
 export type GovernanceOperation = 'ENROLL' | 'RETIRE' | 'ROTATE';
@@ -12,7 +13,21 @@ export type VerifiedGovernanceActor = Readonly<{
 export class IntegrationWorkerGovernanceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async record(workerId: string, operation: GovernanceOperation,
+  /** Unverified actor-object API is closed to prevent identity spoofing. */
+  async record(_workerId: string, _operation: GovernanceOperation,
+    _action: GovernanceAction, _actor: VerifiedGovernanceActor): Promise<boolean> {
+    return false;
+  }
+
+  async recordAuthenticated(workerId: string, operation: GovernanceOperation,
+    action: GovernanceAction, envelope: string, signingKey: string,
+    nowSeconds: number): Promise<boolean> {
+    const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
+    if (!actor) return false;
+    return this.recordVerified(workerId, operation, action, actor);
+  }
+
+  private async recordVerified(workerId: string, operation: GovernanceOperation,
     action: GovernanceAction, actor: VerifiedGovernanceActor): Promise<boolean> {
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) ||
         !['ENROLL', 'RETIRE', 'ROTATE'].includes(operation) ||
