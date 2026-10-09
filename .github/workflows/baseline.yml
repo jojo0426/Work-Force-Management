@@ -154,6 +154,14 @@ jobs:
         run: npm run test:phase5e-reconciliation-database
       - run: npm run test:phase5e-external-dispatch-gate
       - run: npm run test:phase5e-production-issuer-readiness
+      - name: Run Phase 5E.2AO shared gateway PostgreSQL race
+        run: npm run test:phase5e-shared-gateway-database
+        env:
+          WFM_SHARED_GATEWAY_FIXTURE: 'true'
+      - name: Run Phase 5E.2AO shared gateway SIGKILL recovery
+        run: npm run test:phase5e-shared-gateway-sigkill-database
+        env:
+          WFM_SHARED_GATEWAY_FIXTURE: 'true'
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
