@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { IntegrationTrustedWorkerService } from './integration-trusted-worker.service';
 import { IntegrationFleetControlService } from './integration-fleet-control.service';
@@ -23,7 +24,9 @@ async function main(): Promise<void> {
       create: { id: 'GLOBAL', enabled: true, generation: 0n },
       update: { enabled: true },
     });
-    check('enroll synthetic expected worker', await first.enroll(id, secret, 'ci_controller'));
+    check('legacy enrollment locked out', !(await first.enroll(id, secret, 'ci_controller')));
+    await a.integrationExpectedWorker.create({ data: { workerId: id,
+      credentialHash: createHash('sha256').update(secret).digest('hex'), approvedBy: 'ci_fixture' } });
     const competing = await Promise.all([
       first.register(id, secret, control.generation),
       second.register(id, secret, control.generation),
