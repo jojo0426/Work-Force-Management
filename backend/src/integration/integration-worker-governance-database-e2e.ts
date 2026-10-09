@@ -27,13 +27,13 @@ async function main(): Promise<void> {
     check('review before proposal denied',
       !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
     check('unprivileged proposal denied',
-      !(await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', { ...alice, privileged: false })));
+      !(await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890', { role: 'VIEWER' }), CI_GOVERNANCE_KEY, CI_NOW)));
     check('first independent proposal accepted',
       await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     check('same actor cannot approve',
       !(await svcA.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
     check('same session cannot approve under different actor',
-      !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', { ...bob, sessionHash: alice.sessionHash })));
+      !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
     const concurrent = await Promise.all([
       svcA.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW),
       svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW),
