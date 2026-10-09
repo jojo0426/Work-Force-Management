@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { GovernanceOperation } from './integration-worker-governance.service';
+import { verifyGovernanceSession } from './integration-governance-session';
 
 const UNRESOLVED = ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] as const;
 
@@ -13,7 +14,21 @@ const UNRESOLVED = ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN']
 export class IntegrationGovernedWorkerMutationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async apply(workerId: string, operation: GovernanceOperation,
+  /** Legacy caller-asserted reviewer identity is not trusted. */
+  async apply(_workerId: string, _operation: GovernanceOperation,
+    _approvedBy: string, _secret?: string): Promise<boolean> {
+    return false;
+  }
+
+  async applyAuthenticated(workerId: string, operation: GovernanceOperation,
+    envelope: string, signingKey: string, nowSeconds: number,
+    secret?: string): Promise<boolean> {
+    const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
+    if (!actor) return false;
+    return this.applyVerified(workerId, operation, actor.actorId, secret);
+  }
+
+  private async applyVerified(workerId: string, operation: GovernanceOperation,
     approvedBy: string, secret?: string): Promise<boolean> {
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) ||
         !/^[A-Za-z0-9_-]{1,80}$/.test(approvedBy) ||
