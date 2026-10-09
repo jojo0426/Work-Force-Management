@@ -63,6 +63,10 @@ async function main(): Promise<void> {
     console.log('PASS: delayed sender denied, duplicate not re-executed');
     console.log('PASS: external outcome remains UNKNOWN; provider quiescence never claimed');
   } finally {
+    // Remove only this isolated CI fixture; no production ledger is touched.
+    await a.integrationSharedGatewayAttempt.deleteMany({
+      where: { requestId: { startsWith: tag } },
+    });
     await Promise.all([a.$disconnect(), b.$disconnect()]);
   }
 }
