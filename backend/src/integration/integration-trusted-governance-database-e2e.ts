@@ -3,6 +3,8 @@ import { createHash, generateKeyPairSync, sign } from 'crypto';
 import { IntegrationWorkerGovernanceService } from './integration-worker-governance.service';
 import { IntegrationGovernedWorkerMutationService } from './integration-governed-worker-mutation.service';
 import { TrustedIssuerConfig } from './integration-trusted-governance-issuer';
+import { IntegrationCredentialRotationReadinessService } from './integration-credential-rotation-readiness.service';
+import { IntegrationLegacyCredentialInventoryService } from './integration-legacy-credential-inventory.service';
 
 function check(label: string, ok: boolean): void {
   if (!ok) throw new Error('FAIL: ' + label);
@@ -66,6 +68,11 @@ async function main(): Promise<void> {
       id, 'ENROLL', reviewer, issuer, now, requestId, secret));
     check('trusted approval cannot replay', !(await mutation.applyTrustedIssuer(
       id, 'ENROLL', reviewer, issuer, now, requestId, secret)));
+    const readiness = await new IntegrationCredentialRotationReadinessService(
+      a as any, new IntegrationLegacyCredentialInventoryService(a as any)).inspect();
+    check('rotation preflight never authorizes rotation or external quiescence',
+      !!readiness && readiness.safeToRotate === false &&
+      readiness.externallyQuiescent === false);
     console.log('Phase 5E.2AK trusted issuer governance PostgreSQL E2E passed.');
   } finally { await Promise.all([a.$disconnect(), b.$disconnect()]); }
 }
