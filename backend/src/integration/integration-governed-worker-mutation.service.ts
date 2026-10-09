@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma.service';
 import { GovernanceOperation } from './integration-worker-governance.service';
 import { verifyGovernanceSession } from './integration-governance-session';
 import { governancePayloadDigest } from './integration-governance-payload';
+import { TrustedIssuerConfig, verifyTrustedGovernanceJwt } from './integration-trusted-governance-issuer';
 
 const UNRESOLVED = ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] as const;
 
@@ -26,6 +27,19 @@ export class IntegrationGovernedWorkerMutationService {
     secret?: string, requestId?: string): Promise<boolean> {
     if (requestId !== undefined && !/^[A-Za-z0-9_-]{16,100}$/.test(requestId)) return false;
     const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
+    if (!actor) return false;
+    return this.applyVerified(workerId, operation, actor.actorId, secret, requestId);
+  }
+
+  /**
+   * Offline trusted-issuer cutover path. Requires pinned key from trusted config.
+   * No live provider I/O and no public controller exposure.
+   */
+  async applyTrustedIssuer(workerId: string, operation: GovernanceOperation,
+    jwt: string, issuer: TrustedIssuerConfig, nowSeconds: number,
+    requestId: string, secret?: string): Promise<boolean> {
+    if (!/^[A-Za-z0-9_-]{16,100}$/.test(requestId)) return false;
+    const actor = verifyTrustedGovernanceJwt(jwt, issuer, nowSeconds);
     if (!actor) return false;
     return this.applyVerified(workerId, operation, actor.actorId, secret, requestId);
   }
