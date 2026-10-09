@@ -533,3 +533,22 @@ model IntegrationEvidenceAttribution {
   @@unique([evidenceId, actorUserId, action])
   @@index([evidenceId, action])
 }
+
+
+// Phase 5E.2AO: shared sandbox gateway ledger. Admission closure is NOT
+// provider quiescence. Never enable live provider dispatch from this model.
+model IntegrationSharedGatewayControl {
+  id         String   @id @default("GLOBAL")
+  stopped    Boolean  @default(true)
+  generation BigInt   @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
+model IntegrationSharedGatewayAttempt {
+  requestId  String   @id
+  generation BigInt
+  status     String   @default("RESERVED")
+  createdAt  DateTime @default(now())
+  settledAt  DateTime?
+  @@index([status, generation])
+}
