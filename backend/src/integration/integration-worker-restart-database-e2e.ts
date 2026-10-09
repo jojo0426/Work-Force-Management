@@ -12,8 +12,9 @@ async function main(): Promise<void> {
       !/\/wfm_ci(?:\?|$)/.test(process.env.DATABASE_URL || '')) {
     throw new Error('Isolated CI PostgreSQL wfm_ci required');
   }
-  const a = new PrismaClient();
-  const b = new PrismaClient();
+  const datasourceUrl = process.env.DATABASE_URL!;
+  const a = new PrismaClient({ datasources: { db: { url: datasourceUrl } } });
+  const b = new PrismaClient({ datasources: { db: { url: datasourceUrl } } });
   const id = 'phase5e2ag-' + Date.now();
   const secret = 'synthetic-high-entropy-placeholder-' + id;
   const first = new IntegrationTrustedWorkerService(a as any);
