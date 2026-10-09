@@ -30,11 +30,21 @@ export class IntegrationGovernedWorkerMutationService {
           where: { workerId, operation },
           orderBy: { createdAt: 'asc' },
         });
-        const approved = events.some(p => p.action === 'PROPOSE' &&
-          events.some(a => a.action === 'APPROVE' &&
-            a.actorId === approvedBy && a.actorId !== p.actorId &&
-            a.sessionHash !== p.sessionHash && a.createdAt >= p.createdAt));
-        if (!approved) return false;
+        const approval = events.find(a => a.action === 'APPROVE' &&
+          a.actorId === approvedBy &&
+          events.some(p => p.action === 'PROPOSE' &&
+            p.actorId !== a.actorId && p.sessionHash !== a.sessionHash &&
+            a.createdAt >= p.createdAt));
+        if (!approval) return false;
+        const consumed = await tx.integrationWorkerGovernanceConsumption.findUnique({
+          where: { approvalEventId: approval.id },
+        });
+        if (consumed) return false;
+        // The unique approvalEventId key serializes competing consumers.
+        // Rollback of a rejected mutation also rolls back consumption.
+        await tx.integrationWorkerGovernanceConsumption.create({
+          data: { approvalEventId: approval.id, workerId, operation, consumedBy: approvedBy },
+        });
         if (operation === 'ENROLL') {
           const exists = await tx.integrationExpectedWorker.findUnique({ where: { workerId } });
           if (exists) return false;
