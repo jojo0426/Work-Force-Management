@@ -23,6 +23,7 @@ async function main(): Promise<void> {
   const secret = 'synthetic-long-secret-' + id;
   const credentialHash = createHash('sha256').update(secret).digest('hex');
   const requestId = 'request-' + id;
+  const retirementRequestId = 'retire-' + id;
   try {
     await a.integrationFleetControl.upsert({
       where: { id: 'GLOBAL' },
@@ -48,20 +49,20 @@ async function main(): Promise<void> {
     check('enrolled credential is hashed',
       enrolled?.credentialHash.length === 64 && enrolled.credentialHash !== secret);
     check('retirement cannot reuse enrollment approval',
-      !(await mutationA.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId)));
+      !(await mutationA.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, retirementRequestId)));
     check('retirement proposal recorded',
-      await governance.recordAuthenticated(id, 'RETIRE', 'PROPOSE', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId));
+      await governance.recordAuthenticated(id, 'RETIRE', 'PROPOSE', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, retirementRequestId));
     check('retirement approval recorded',
-      await governance.recordAuthenticated(id, 'RETIRE', 'APPROVE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId));
+      await governance.recordAuthenticated(id, 'RETIRE', 'APPROVE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, retirementRequestId));
     const pending = await a.integrationAdmission.count({
       where: { status: { in: ['ADMITTED','MAY_HAVE_DISPATCHED','IN_FLIGHT','UNCERTAIN'] } },
     });
-    const retired = await mutationB.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId);
+    const retired = await mutationB.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, retirementRequestId);
     check('retirement respects global unresolved ledger',
       pending === 0 ? retired : !retired);
     if (retired) {
       check('retirement cannot be replayed',
-        !(await mutationA.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId)));
+        !(await mutationA.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, retirementRequestId)));
     }
     console.log('Phase 5E.2AH governed mutation PostgreSQL E2E passed.');
   } finally {
