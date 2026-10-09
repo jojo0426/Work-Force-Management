@@ -169,6 +169,11 @@ jobs:
         run: npm run test:phase5e-shared-gateway-sigkill-database
         env:
           WFM_SHARED_GATEWAY_FIXTURE: 'true'
+      - name: Run Phase 5E.2AP synthetic send gateway PostgreSQL E2E
+        run: npm run test:phase5e-synthetic-send-gateway-database
+        env:
+          WFM_SHARED_GATEWAY_FIXTURE: 'true'
+          WFM_SYNTHETIC_SEND_GATEWAY_FIXTURE: 'true'
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
