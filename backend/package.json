@@ -92,7 +92,8 @@
         "test:phase5e-worker-governance-database": "ts-node src/integration/integration-worker-governance-database-e2e.ts",
         "test:phase5e-governed-worker-mutation-database": "ts-node src/integration/integration-governed-worker-mutation-database-e2e.ts",
         "test:phase5e-governance-payload": "ts-node src/integration/integration-governance-payload-selftest.ts",
-        "test:phase5e-governance-request-database": "ts-node src/integration/integration-governance-request-database-e2e.ts"
+        "test:phase5e-governance-request-database": "ts-node src/integration/integration-governance-request-database-e2e.ts",
+        "test:phase5e-trusted-issuer": "ts-node src/integration/integration-trusted-governance-issuer-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
