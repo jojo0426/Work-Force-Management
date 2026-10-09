@@ -17,23 +17,24 @@ async function main(): Promise<void> {
   try {
     const before = await gateA.inspect();
     assert(before?.stopped, 'migration starts with STOP');
-    assert.equal(await gateA.reserve(request, 0n), 'STOPPED');
-    assert.equal(await gateA.fixtureRearm(1n), true);
+    assert.equal(await gateA.reserve(request, before.generation), 'STOPPED');
+    const epoch = before.generation + 1n;
+    assert.equal(await gateA.fixtureRearm(epoch), true);
     const contenders = await Promise.all([
-      gateA.reserve(request, 1n), gateB.reserve(request, 1n),
+      gateA.reserve(request, epoch), gateB.reserve(request, epoch),
     ]);
     assert.deepEqual(contenders.sort(), ['DUPLICATE', 'RESERVED']);
-    const stopped = await gateB.stop(2n);
+    const stopped = await gateB.stop(epoch + 1n);
     assert.equal(stopped.admissionsClosed, true);
     assert.equal(stopped.externallyQuiescent, false);
     assert.equal(stopped.unresolvedAttempts, 1);
-    assert.equal(await gateA.reserve(delayed, 1n), 'STOPPED');
-    assert.equal(await gateA.reserve(tag + '-fresh', 2n), 'STOPPED');
+    assert.equal(await gateA.reserve(delayed, epoch), 'STOPPED');
+    assert.equal(await gateA.reserve(tag + '-fresh', epoch + 1n), 'STOPPED');
     assert.equal(await gateB.markUnknown(request), true);
     const recovered = await gateA.inspect();
     assert.equal(recovered?.unresolvedAttempts, 1);
     assert.equal(recovered?.externallyQuiescent, false);
-    assert.equal(await gateB.fixtureRearm(3n), false,
+    assert.equal(await gateB.fixtureRearm(epoch + 2n), false,
       'unresolved attempts block rearm');
     const persisted = await b.integrationSharedGatewayAttempt.findUnique({
       where: { requestId: request },
