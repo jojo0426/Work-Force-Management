@@ -47,7 +47,7 @@ export class IntegrationGovernedWorkerMutationService {
           operation === 'ENROLL' ? createHash('sha256').update(secret!).digest('hex') : undefined);
         if (!digest) return false;
         const events = await tx.integrationWorkerGovernanceEvent.findMany({
-          where: { workerId, operation, payloadDigest: digest, requestId: requestId || null },
+          where: { workerId, operation, payloadDigest: digest, requestId },
           orderBy: { createdAt: 'asc' },
         });
         const approval = events.find(a => a.action === 'APPROVE' &&
