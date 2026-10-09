@@ -397,7 +397,7 @@ model IntegrationWorkerGovernanceEvent {
   payloadDigest String?
   requestId   String?
   createdAt   DateTime @default(now())
-  @@unique([workerId, operation, actorId, action])
+  @@unique([requestId, actorId, action])
   @@index([workerId, operation, action])
   @@index([requestId, action])
 }
