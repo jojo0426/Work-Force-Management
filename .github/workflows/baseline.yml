@@ -154,6 +154,8 @@ jobs:
         run: npm run test:phase5e-reconciliation-database
       - run: npm run test:phase5e-external-dispatch-gate
       - run: npm run test:phase5e-production-issuer-readiness
+      - name: Run Phase 5E.2AP synthetic send lockout security contract
+        run: npm run test:phase5e-synthetic-send-lockout
       - name: Run Phase 5E.2AP synthetic external send boundary PostgreSQL E2E
         run: npm run test:phase5e-synthetic-send-gateway-database
         env:
