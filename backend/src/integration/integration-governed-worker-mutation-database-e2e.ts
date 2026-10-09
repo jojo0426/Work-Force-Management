@@ -27,17 +27,17 @@ async function main(): Promise<void> {
       update: { enabled: false },
     });
     check('enrollment denied without governance',
-      !(await mutationA.apply(id, 'ENROLL', reviewer.actorId, secret)));
+      !(await mutationA.applyAuthenticated(id, 'ENROLL', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, secret)));
     check('proposal recorded', await governance.recordAuthenticated(id, 'ENROLL', 'PROPOSE', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     check('proposal alone cannot authorize enrollment',
-      !(await mutationA.apply(id, 'ENROLL', reviewer.actorId, secret)));
+      !(await mutationA.applyAuthenticated(id, 'ENROLL', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, secret)));
     check('independent approval recorded',
       await governance.recordAuthenticated(id, 'ENROLL', 'APPROVE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     check('wrong approver cannot execute',
-      !(await mutationB.apply(id, 'ENROLL', proposer.actorId, secret)));
+      !(await mutationB.applyAuthenticated(id, 'ENROLL', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, secret)));
     const concurrent = await Promise.all([
-      mutationA.apply(id, 'ENROLL', reviewer.actorId, secret),
-      mutationB.apply(id, 'ENROLL', reviewer.actorId, secret),
+      mutationA.applyAuthenticated(id, 'ENROLL', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, secret),
+      mutationB.applyAuthenticated(id, 'ENROLL', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, secret),
     ]);
     check('concurrent approved enrollment has exactly one winner',
       concurrent.filter(Boolean).length === 1);
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
     check('enrolled credential is hashed',
       enrolled?.credentialHash.length === 64 && enrolled.credentialHash !== secret);
     check('retirement cannot reuse enrollment approval',
-      !(await mutationA.apply(id, 'RETIRE', reviewer.actorId)));
+      !(await mutationA.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
     check('retirement proposal recorded',
       await governance.recordAuthenticated(id, 'RETIRE', 'PROPOSE', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     check('retirement approval recorded',
@@ -53,12 +53,12 @@ async function main(): Promise<void> {
     const pending = await a.integrationAdmission.count({
       where: { status: { in: ['ADMITTED','MAY_HAVE_DISPATCHED','IN_FLIGHT','UNCERTAIN'] } },
     });
-    const retired = await mutationB.apply(id, 'RETIRE', reviewer.actorId);
+    const retired = await mutationB.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW);
     check('retirement respects global unresolved ledger',
       pending === 0 ? retired : !retired);
     if (retired) {
       check('retirement cannot be replayed',
-        !(await mutationA.apply(id, 'RETIRE', reviewer.actorId)));
+        !(await mutationA.applyAuthenticated(id, 'RETIRE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
     }
     console.log('Phase 5E.2AH governed mutation PostgreSQL E2E passed.');
   } finally {
