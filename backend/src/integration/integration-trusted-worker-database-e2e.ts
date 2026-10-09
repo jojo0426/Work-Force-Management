@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { IntegrationTrustedWorkerService } from './integration-trusted-worker.service';
 import { IntegrationFleetControlService } from './integration-fleet-control.service';
@@ -24,8 +25,11 @@ async function main(): Promise<void> {
       create: { id: 'GLOBAL', enabled: true, generation: 0n },
       update: { enabled: true },
     });
-    check('approved worker enrolled', await trustedA.enroll(workerId, secret, 'ci_controller'));
-    check('second expected worker enrolled', await trustedA.enroll(secondId, secret + '-2', 'ci_controller'));
+    check('legacy enrollment locked out', !(await trustedA.enroll(workerId, secret, 'ci_controller')));
+    await a.integrationExpectedWorker.create({ data: { workerId,
+      credentialHash: createHash('sha256').update(secret).digest('hex'), approvedBy: 'ci_fixture' } });
+    await a.integrationExpectedWorker.create({ data: { workerId: secondId,
+      credentialHash: createHash('sha256').update(secret + '-2').digest('hex'), approvedBy: 'ci_fixture' } });
     check('unapproved identity cannot register',
       !(await trustedB.register(workerId + '-rogue', secret, fleet.generation)));
     check('wrong credential rejected',
@@ -55,22 +59,8 @@ async function main(): Promise<void> {
     const restarted = new IntegrationTrustedWorkerService(b as any);
     check('new service instance cannot seize registered identity',
       !(await restarted.register(workerId, secret, stop.generation!)));
-    // Prior CI suites may leave unresolved synthetic admissions; never
-    // assume a globally clean ledger or force reconciliation in this test.
-    const retirement = await trustedB.retire(secondId, 'ci_controller');
-    const outstanding = await b.integrationAdmission.count({
-      where: { status: { in: ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] } },
-    });
-    check('retirement blocked while global ledger is unresolved',
-      outstanding === 0 || !retirement);
-    if (retirement) {
-      check('retired worker cannot register',
-        !(await trustedA.register(secondId, secret + '-2', stop.generation!)));
-      check('repeat retirement denied',
-        !(await trustedB.retire(secondId, 'ci_controller')));
-    }
-    check('retirement never upgrades provider quiescence',
-      (await trustedA.inspect()).externallyQuiescent === false);
+    check('legacy retirement locked out', !(await trustedB.retire(secondId, 'ci_controller')));
+    check('no external quiescence claim', (await trustedA.inspect()).externallyQuiescent === false);
     console.log('Phase 5E.2AF trusted membership PostgreSQL E2E passed.');
   } finally {
     await Promise.all([a.$disconnect(), b.$disconnect()]);
