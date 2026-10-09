@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { CI_GOVERNANCE_KEY, CI_NOW, syntheticGovernanceSession } from './integration-governance-session-test-fixture';
 import { IntegrationWorkerGovernanceService } from './integration-worker-governance.service';
 import { IntegrationGovernedWorkerMutationService } from './integration-governed-worker-mutation.service';
 
@@ -27,11 +28,11 @@ async function main(): Promise<void> {
     });
     check('enrollment denied without governance',
       !(await mutationA.apply(id, 'ENROLL', reviewer.actorId, secret)));
-    check('proposal recorded', await governance.record(id, 'ENROLL', 'PROPOSE', proposer));
+    check('proposal recorded', await governance.recordAuthenticated(id, 'ENROLL', 'PROPOSE', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     check('proposal alone cannot authorize enrollment',
       !(await mutationA.apply(id, 'ENROLL', reviewer.actorId, secret)));
     check('independent approval recorded',
-      await governance.record(id, 'ENROLL', 'APPROVE', reviewer));
+      await governance.recordAuthenticated(id, 'ENROLL', 'APPROVE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     check('wrong approver cannot execute',
       !(await mutationB.apply(id, 'ENROLL', proposer.actorId, secret)));
     const concurrent = await Promise.all([
@@ -46,9 +47,9 @@ async function main(): Promise<void> {
     check('retirement cannot reuse enrollment approval',
       !(await mutationA.apply(id, 'RETIRE', reviewer.actorId)));
     check('retirement proposal recorded',
-      await governance.record(id, 'RETIRE', 'PROPOSE', proposer));
+      await governance.recordAuthenticated(id, 'RETIRE', 'PROPOSE', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     check('retirement approval recorded',
-      await governance.record(id, 'RETIRE', 'APPROVE', reviewer));
+      await governance.recordAuthenticated(id, 'RETIRE', 'APPROVE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
     const pending = await a.integrationAdmission.count({
       where: { status: { in: ['ADMITTED','MAY_HAVE_DISPATCHED','IN_FLIGHT','UNCERTAIN'] } },
     });
