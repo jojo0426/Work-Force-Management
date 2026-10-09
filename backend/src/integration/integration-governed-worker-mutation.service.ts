@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { GovernanceOperation } from './integration-worker-governance.service';
 import { verifyGovernanceSession } from './integration-governance-session';
+import { governancePayloadDigest } from './integration-governance-payload';
 
 const UNRESOLVED = ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] as const;
 
@@ -41,8 +42,11 @@ export class IntegrationGovernedWorkerMutationService {
           WHERE "id" = 'GLOBAL' FOR UPDATE
         `;
         if (fleet.length !== 1 || fleet[0].enabled) return false;
+        const digest = governancePayloadDigest(workerId, operation as 'ENROLL' | 'RETIRE',
+          operation === 'ENROLL' ? createHash('sha256').update(secret!).digest('hex') : undefined);
+        if (!digest) return false;
         const events = await tx.integrationWorkerGovernanceEvent.findMany({
-          where: { workerId, operation },
+          where: { workerId, operation, payloadDigest: digest },
           orderBy: { createdAt: 'asc' },
         });
         const approval = events.find(a => a.action === 'APPROVE' &&
