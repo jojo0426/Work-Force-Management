@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { createHash } from 'crypto';
 import { CI_GOVERNANCE_KEY, CI_NOW, syntheticGovernanceSession } from './integration-governance-session-test-fixture';
 import { IntegrationWorkerGovernanceService } from './integration-worker-governance.service';
 import { IntegrationGovernedWorkerMutationService } from './integration-governed-worker-mutation.service';
@@ -20,6 +21,7 @@ async function main(): Promise<void> {
   const proposer = { actorId: id + '-proposer', sessionHash: 'c'.repeat(64), privileged: true };
   const reviewer = { actorId: id + '-reviewer', sessionHash: 'd'.repeat(64), privileged: true };
   const secret = 'synthetic-long-secret-' + id;
+  const credentialHash = createHash('sha256').update(secret).digest('hex');
   try {
     await a.integrationFleetControl.upsert({
       where: { id: 'GLOBAL' },
@@ -28,11 +30,11 @@ async function main(): Promise<void> {
     });
     check('enrollment denied without governance',
       !(await mutationA.applyAuthenticated(id, 'ENROLL', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, secret)));
-    check('proposal recorded', await governance.recordAuthenticated(id, 'ENROLL', 'PROPOSE', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
+    check('proposal recorded', await governance.recordAuthenticated(id, 'ENROLL', 'PROPOSE', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, credentialHash));
     check('proposal alone cannot authorize enrollment',
       !(await mutationA.applyAuthenticated(id, 'ENROLL', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, secret)));
     check('independent approval recorded',
-      await governance.recordAuthenticated(id, 'ENROLL', 'APPROVE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
+      await governance.recordAuthenticated(id, 'ENROLL', 'APPROVE', syntheticGovernanceSession(reviewer.actorId, 'reviewer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, credentialHash));
     check('wrong approver cannot execute',
       !(await mutationB.applyAuthenticated(id, 'ENROLL', syntheticGovernanceSession(proposer.actorId, 'proposer-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, secret)));
     const concurrent = await Promise.all([
