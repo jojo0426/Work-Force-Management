@@ -118,6 +118,10 @@ jobs:
         run: npm run test:phase5e-trusted-governance-database
       - name: Run Phase 5E.2AL actual worker SIGKILL durability PostgreSQL E2E
         run: npm run test:phase5e-worker-sigkill-database
+      - name: Run Phase 5E.2AM adversarial two-replica dispatch fence
+        run: npm run test:phase5e-multireplica-inflight-fence
+      - name: Run Phase 5E.2AM in-flight SIGKILL PostgreSQL E2E
+        run: npm run test:phase5e-inflight-sigkill-database
       - name: Run Phase 5E reconciliation quarantine regression
         run: npm run test:phase5e-reconciliation
       - name: Run Phase 5E drain status regression
