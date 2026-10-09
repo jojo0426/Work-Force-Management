@@ -18,6 +18,7 @@ async function main(): Promise<void> {
   const svcB = new IntegrationWorkerGovernanceService(b as any);
   const alice = { actorId: id + '-alice', sessionHash: 'a'.repeat(64), privileged: true };
   const bob = { actorId: id + '-bob', sessionHash: 'b'.repeat(64), privileged: true };
+  const requestId = 'request-' + id;
   try {
     await a.integrationFleetControl.upsert({
       where: { id: 'GLOBAL' },
@@ -25,18 +26,18 @@ async function main(): Promise<void> {
       update: { enabled: false },
     });
     check('review before proposal denied',
-      !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
+      !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId)));
     check('unprivileged proposal denied',
-      !(await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890', { role: 'VIEWER' }), CI_GOVERNANCE_KEY, CI_NOW)));
+      !(await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890', { role: 'VIEWER' }), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId)));
     check('first independent proposal accepted',
-      await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW));
+      await svcA.recordAuthenticated(id, 'ROTATE', 'PROPOSE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId));
     check('same actor cannot approve',
-      !(await svcA.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
+      !(await svcA.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(alice.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId)));
     check('same session cannot approve under different actor',
-      !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW)));
+      !(await svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'alice-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId)));
     const concurrent = await Promise.all([
-      svcA.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW),
-      svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW),
+      svcA.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId),
+      svcB.recordAuthenticated(id, 'ROTATE', 'APPROVE', syntheticGovernanceSession(bob.actorId, 'bob-session-1234567890'), CI_GOVERNANCE_KEY, CI_NOW, undefined, requestId),
     ]);
     check('concurrent review exactly one winner', concurrent.filter(Boolean).length === 1);
     check('independent approval persists across database connections',
