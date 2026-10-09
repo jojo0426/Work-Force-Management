@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { verifyGovernanceSession } from './integration-governance-session';
+import { governancePayloadDigest } from './integration-governance-payload';
 
 export type GovernanceAction = 'PROPOSE' | 'APPROVE';
 export type GovernanceOperation = 'ENROLL' | 'RETIRE' | 'ROTATE';
@@ -21,14 +22,18 @@ export class IntegrationWorkerGovernanceService {
 
   async recordAuthenticated(workerId: string, operation: GovernanceOperation,
     action: GovernanceAction, envelope: string, signingKey: string,
-    nowSeconds: number): Promise<boolean> {
+    nowSeconds: number, credentialHash?: string): Promise<boolean> {
     const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
     if (!actor) return false;
-    return this.recordVerified(workerId, operation, action, actor);
+    const digest = operation === 'ROTATE' ? null :
+      governancePayloadDigest(workerId, operation, credentialHash);
+    if (!digest) return false;
+    return this.recordVerified(workerId, operation, action, actor, digest);
   }
 
   private async recordVerified(workerId: string, operation: GovernanceOperation,
-    action: GovernanceAction, actor: VerifiedGovernanceActor): Promise<boolean> {
+    action: GovernanceAction, actor: VerifiedGovernanceActor,
+    payloadDigest: string): Promise<boolean> {
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) ||
         !['ENROLL', 'RETIRE', 'ROTATE'].includes(operation) ||
         !['PROPOSE', 'APPROVE'].includes(action) ||
@@ -43,14 +48,14 @@ export class IntegrationWorkerGovernanceService {
         if (control.length !== 1 || control[0].enabled) return false;
         if (action === 'APPROVE') {
           const proposals = await tx.integrationWorkerGovernanceEvent.findMany({
-            where: { workerId, operation, action: 'PROPOSE' },
+            where: { workerId, operation, action: 'PROPOSE', payloadDigest },
           });
           if (!proposals.some(p => p.actorId !== actor.actorId &&
               p.sessionHash !== actor.sessionHash)) return false;
         }
         await tx.integrationWorkerGovernanceEvent.create({
           data: { workerId, operation, action, actorId: actor.actorId,
-            sessionHash: actor.sessionHash },
+            sessionHash: actor.sessionHash, payloadDigest },
         });
         return true;
       });
