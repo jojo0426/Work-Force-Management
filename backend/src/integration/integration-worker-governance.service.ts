@@ -28,7 +28,7 @@ export class IntegrationWorkerGovernanceService {
     // Synthetic identity is restricted to explicit isolated CI fixture runs.
     if (process.env.GITHUB_ACTIONS !== 'true' ||
         process.env.WFM_SYNTHETIC_GOVERNANCE_FIXTURE !== 'true' ||
-        !/\\/wfm_ci(?:\\?|$)/.test(process.env.DATABASE_URL || '')) return false;
+        !new RegExp('[/]wfm_ci(?:[?]|$)').test(process.env.DATABASE_URL || '')) return false;
     const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
     if (!actor) return false;
     const digest = operation === 'ROTATE' ?
