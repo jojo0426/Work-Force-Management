@@ -23,19 +23,19 @@ export class IntegrationWorkerGovernanceService {
 
   async recordAuthenticated(workerId: string, operation: GovernanceOperation,
     action: GovernanceAction, envelope: string, signingKey: string,
-    nowSeconds: number, credentialHash?: string): Promise<boolean> {
+    nowSeconds: number, credentialHash?: string, requestId?: string): Promise<boolean> {
     const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
     if (!actor) return false;
     const digest = operation === 'ROTATE' ?
       createHash('sha256').update('ROTATE:' + workerId).digest('hex') :
       governancePayloadDigest(workerId, operation, credentialHash);
-    if (!digest) return false;
-    return this.recordVerified(workerId, operation, action, actor, digest);
+    if (!digest || (requestId !== undefined && !/^[A-Za-z0-9_-]{16,100}$/.test(requestId))) return false;
+    return this.recordVerified(workerId, operation, action, actor, digest, requestId);
   }
 
   private async recordVerified(workerId: string, operation: GovernanceOperation,
     action: GovernanceAction, actor: VerifiedGovernanceActor,
-    payloadDigest: string): Promise<boolean> {
+    payloadDigest: string, requestId?: string): Promise<boolean> {
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) ||
         !['ENROLL', 'RETIRE', 'ROTATE'].includes(operation) ||
         !['PROPOSE', 'APPROVE'].includes(action) ||
@@ -50,14 +50,14 @@ export class IntegrationWorkerGovernanceService {
         if (control.length !== 1 || control[0].enabled) return false;
         if (action === 'APPROVE') {
           const proposals = await tx.integrationWorkerGovernanceEvent.findMany({
-            where: { workerId, operation, action: 'PROPOSE', payloadDigest },
+            where: { workerId, operation, action: 'PROPOSE', payloadDigest, requestId: requestId || null },
           });
           if (!proposals.some(p => p.actorId !== actor.actorId &&
               p.sessionHash !== actor.sessionHash)) return false;
         }
         await tx.integrationWorkerGovernanceEvent.create({
           data: { workerId, operation, action, actorId: actor.actorId,
-            sessionHash: actor.sessionHash, payloadDigest },
+            sessionHash: actor.sessionHash, payloadDigest, requestId },
         });
         return true;
       });
