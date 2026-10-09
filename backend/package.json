@@ -102,7 +102,8 @@
         "test:phase5e-production-issuer-readiness": "ts-node src/integration/integration-production-issuer-readiness-selftest.ts",
         "test:phase5e-shared-gateway-database": "ts-node src/integration/integration-shared-gateway-database-e2e.ts",
         "test:phase5e-shared-gateway-sigkill-database": "ts-node src/integration/integration-shared-gateway-sigkill-database-e2e.ts",
-        "test:phase5e-synthetic-send-gateway-database": "ts-node src/integration/integration-synthetic-send-gateway-database-e2e.ts"
+        "test:phase5e-synthetic-send-gateway-database": "ts-node src/integration/integration-synthetic-send-gateway-database-e2e.ts",
+        "test:phase5e-synthetic-send-lockout": "ts-node src/integration/integration-synthetic-send-gateway-lockout-selftest.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
