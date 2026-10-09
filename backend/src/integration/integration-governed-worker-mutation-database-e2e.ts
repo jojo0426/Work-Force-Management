@@ -1,0 +1,67 @@
+import { PrismaClient } from '@prisma/client';
+import { IntegrationWorkerGovernanceService } from './integration-worker-governance.service';
+import { IntegrationGovernedWorkerMutationService } from './integration-governed-worker-mutation.service';
+
+function check(label: string, ok: boolean): void {
+  if (!ok) throw new Error('FAIL: ' + label);
+  console.log('PASS: ' + label);
+}
+async function main(): Promise<void> {
+  if (process.env.GITHUB_ACTIONS !== 'true' ||
+      !/\/wfm_ci(?:\?|$)/.test(process.env.DATABASE_URL || '')) {
+    throw new Error('Isolated CI PostgreSQL wfm_ci required');
+  }
+  const a = new PrismaClient(), b = new PrismaClient();
+  const id = 'phase5e2ah-gated-' + Date.now();
+  const governance = new IntegrationWorkerGovernanceService(a as any);
+  const mutationA = new IntegrationGovernedWorkerMutationService(a as any);
+  const mutationB = new IntegrationGovernedWorkerMutationService(b as any);
+  const proposer = { actorId: id + '-proposer', sessionHash: 'c'.repeat(64), privileged: true };
+  const reviewer = { actorId: id + '-reviewer', sessionHash: 'd'.repeat(64), privileged: true };
+  const secret = 'synthetic-long-secret-' + id;
+  try {
+    await a.integrationFleetControl.upsert({
+      where: { id: 'GLOBAL' },
+      create: { id: 'GLOBAL', enabled: false, generation: 0n },
+      update: { enabled: false },
+    });
+    check('enrollment denied without governance',
+      !(await mutationA.apply(id, 'ENROLL', reviewer.actorId, secret)));
+    check('proposal recorded', await governance.record(id, 'ENROLL', 'PROPOSE', proposer));
+    check('proposal alone cannot authorize enrollment',
+      !(await mutationA.apply(id, 'ENROLL', reviewer.actorId, secret)));
+    check('independent approval recorded',
+      await governance.record(id, 'ENROLL', 'APPROVE', reviewer));
+    check('wrong approver cannot execute',
+      !(await mutationB.apply(id, 'ENROLL', proposer.actorId, secret)));
+    const concurrent = await Promise.all([
+      mutationA.apply(id, 'ENROLL', reviewer.actorId, secret),
+      mutationB.apply(id, 'ENROLL', reviewer.actorId, secret),
+    ]);
+    check('concurrent approved enrollment has exactly one winner',
+      concurrent.filter(Boolean).length === 1);
+    const enrolled = await b.integrationExpectedWorker.findUnique({ where: { workerId: id } });
+    check('enrolled credential is hashed',
+      enrolled?.credentialHash.length === 64 && enrolled.credentialHash !== secret);
+    check('retirement cannot reuse enrollment approval',
+      !(await mutationA.apply(id, 'RETIRE', reviewer.actorId)));
+    check('retirement proposal recorded',
+      await governance.record(id, 'RETIRE', 'PROPOSE', proposer));
+    check('retirement approval recorded',
+      await governance.record(id, 'RETIRE', 'APPROVE', reviewer));
+    const pending = await a.integrationAdmission.count({
+      where: { status: { in: ['ADMITTED','MAY_HAVE_DISPATCHED','IN_FLIGHT','UNCERTAIN'] } },
+    });
+    const retired = await mutationB.apply(id, 'RETIRE', reviewer.actorId);
+    check('retirement respects global unresolved ledger',
+      pending === 0 ? retired : !retired);
+    if (retired) {
+      check('retirement cannot be replayed',
+        !(await mutationA.apply(id, 'RETIRE', reviewer.actorId)));
+    }
+    console.log('Phase 5E.2AH governed mutation PostgreSQL E2E passed.');
+  } finally {
+    await Promise.all([a.$disconnect(), b.$disconnect()]);
+  }
+}
+main().catch(e => { console.error(e); process.exit(1); });
