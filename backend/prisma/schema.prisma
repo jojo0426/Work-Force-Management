@@ -399,6 +399,15 @@ model IntegrationWorkerGovernanceEvent {
   @@index([workerId, operation, action])
 }
 
+// Phase 5E.2AH: one-time approval consumption, never reusable.
+model IntegrationWorkerGovernanceConsumption {
+  approvalEventId String @id
+  workerId        String
+  operation       String
+  consumedBy      String
+  consumedAt      DateTime @default(now())
+}
+
 model IntegrationExpectedWorker {
   workerId       String   @id
   credentialHash String
