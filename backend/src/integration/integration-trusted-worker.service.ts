@@ -18,15 +18,9 @@ function safeMatch(expected: string, actual: string): boolean {
 export class IntegrationTrustedWorkerService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async enroll(workerId: string, secret: string, approvedBy: string): Promise<boolean> {
-    if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) || secret.length < 32 ||
-        !/^[A-Za-z0-9_-]{1,80}$/.test(approvedBy)) return false;
-    try {
-      await this.prisma.integrationExpectedWorker.create({
-        data: { workerId, credentialHash: fingerprint(secret), approvedBy },
-      });
-      return true;
-    } catch { return false; }
+  /** Deprecated unaudited roster mutation: permanently fail closed. */
+  async enroll(_workerId: string, _secret: string, _approvedBy: string): Promise<boolean> {
+    return false;
   }
 
   async register(workerId: string, secret: string, generation: bigint): Promise<boolean> {
@@ -78,31 +72,9 @@ export class IntegrationTrustedWorkerService {
    * Retirement never deletes historical membership or claims external drain.
    * A separate operator approval workflow is still required before production.
    */
-  async retire(workerId: string, approvedBy: string): Promise<boolean> {
-    if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) ||
-        !/^[A-Za-z0-9_-]{1,80}$/.test(approvedBy)) return false;
-    try {
-      return await this.prisma.$transaction(async tx => {
-        const rows = await tx.$queryRaw<Array<{ enabled: boolean }>>`
-          SELECT "enabled" FROM "IntegrationFleetControl"
-          WHERE "id" = 'GLOBAL' FOR UPDATE
-        `;
-        if (rows.length !== 1 || rows[0].enabled) return false;
-        const unresolved = await tx.integrationAdmission.count({
-          where: { status: { in: ['ADMITTED', 'MAY_HAVE_DISPATCHED', 'IN_FLIGHT', 'UNCERTAIN'] } },
-        });
-        if (unresolved !== 0) return false;
-        const membership = await tx.integrationWorkerMembership.findUnique({
-          where: { workerId }, select: { activeAttempts: true },
-        });
-        if (membership && membership.activeAttempts !== 0) return false;
-        const updated = await tx.integrationExpectedWorker.updateMany({
-          where: { workerId, retiredAt: null },
-          data: { retiredAt: new Date() },
-        });
-        return updated.count === 1;
-      });
-    } catch { return false; }
+  /** Deprecated unaudited roster mutation: permanently fail closed. */
+  async retire(_workerId: string, _approvedBy: string): Promise<boolean> {
+    return false;
   }
 
   /** Derive expected workers from the database, never a caller-provided subset. */
