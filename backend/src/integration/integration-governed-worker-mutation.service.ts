@@ -23,14 +23,15 @@ export class IntegrationGovernedWorkerMutationService {
 
   async applyAuthenticated(workerId: string, operation: GovernanceOperation,
     envelope: string, signingKey: string, nowSeconds: number,
-    secret?: string): Promise<boolean> {
+    secret?: string, requestId?: string): Promise<boolean> {
+    if (requestId !== undefined && !/^[A-Za-z0-9_-]{16,100}$/.test(requestId)) return false;
     const actor = verifyGovernanceSession(envelope, signingKey, nowSeconds);
     if (!actor) return false;
-    return this.applyVerified(workerId, operation, actor.actorId, secret);
+    return this.applyVerified(workerId, operation, actor.actorId, secret, requestId);
   }
 
   private async applyVerified(workerId: string, operation: GovernanceOperation,
-    approvedBy: string, secret?: string): Promise<boolean> {
+    approvedBy: string, secret?: string, requestId?: string): Promise<boolean> {
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(workerId) ||
         !/^[A-Za-z0-9_-]{1,80}$/.test(approvedBy) ||
         !['ENROLL', 'RETIRE'].includes(operation) ||
@@ -46,7 +47,7 @@ export class IntegrationGovernedWorkerMutationService {
           operation === 'ENROLL' ? createHash('sha256').update(secret!).digest('hex') : undefined);
         if (!digest) return false;
         const events = await tx.integrationWorkerGovernanceEvent.findMany({
-          where: { workerId, operation, payloadDigest: digest },
+          where: { workerId, operation, payloadDigest: digest, requestId: requestId || null },
           orderBy: { createdAt: 'asc' },
         });
         const approval = events.find(a => a.action === 'APPROVE' &&
