@@ -153,6 +153,7 @@ jobs:
       - name: Run Phase 5E isolated reconciliation database E2E
         run: npm run test:phase5e-reconciliation-database
       - run: npm run test:phase5e-external-dispatch-gate
+      - run: npm run test:phase5e-production-issuer-readiness
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
 
