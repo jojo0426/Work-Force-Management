@@ -9,6 +9,7 @@
 - Corrected the CI #660 destination assertion: malformed URL/hostname input is `INVALID_REQUEST`; a syntactically valid destination ID outside the allowlist is `UNTRUSTED_DESTINATION`. Both remain denied.
 - Runtime policy validation rejects missing/non-boolean STOP, invalid generations, malformed allowlists and malformed fingerprint inventories before admission. Empty trust lists deny requests. This guards runtime configuration despite TypeScript declarations; it does not authenticate caller identity.
 - Existing Phase 5E.2AP synthetic PostgreSQL send boundary and unknown-outcome handling remain intact.
+- Added an isolated PostgreSQL SIGKILL acceptance test at entry to the actual synthetic-send callback. An independent client checks that UNKNOWN is committed before the kill; a restarted sender must deny replay, STOP must retain unresolved outcomes without claiming quiescence, and rearm must stay blocked. This is synthetic process-failure coverage, not evidence of external network enforcement. Acceptance requires its CI execution to pass.
 
 ## Not yet established
 - A fingerprint string in a request is **not authenticated identity**. A production gateway must obtain caller identity from verified mTLS peer certificates or independently validated signed service tokens, not from caller assertions.
