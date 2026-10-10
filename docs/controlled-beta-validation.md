@@ -43,7 +43,7 @@ npm audit --omit=dev --audit-level=high
 | Exact release candidate | All baseline jobs and required steps successful for that SHA | Verify per candidate |
 | Dispatch and lifecycle | Excel validation, assignment/reassignment races, technician Start/Finish and field-exception DB E2E | Mandatory CI plus device acceptance |
 | Auth and RBAC | Missing/expired tokens, disabled users, wrong roles, cross-team access and approval-session binding | Mandatory security tests |
-| GPS live sessions | Expired/disabled/role-changed sockets cannot update or receive management locations | GPS regression gate; runtime acceptance pending |
+| GPS live sessions | Expired/disabled/role-changed sockets cannot update or receive management locations; polling and direct upgrades enforce `CORS_ORIGINS` | GPS regression gate with local transport tests; device acceptance pending |
 | Geographic records | First-visit subscriber/NAP verification, verified-record reuse, changed-address discrepancy and transfer old/new-address navigation | Device and operator acceptance pending |
 | Evidence | Camera-only capture, private upload, expired tickets, completion evidence, speed-test capture, retry without duplicate submission | Device/storage acceptance pending |
 | Reports and KPIs | Daily/weekly/monthly totals, team/technician summaries, Excel export and print layout compared to seeded jobs | Operator acceptance pending |

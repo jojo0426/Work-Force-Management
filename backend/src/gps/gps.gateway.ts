@@ -3,8 +3,13 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole, UserStatus } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../prisma.service';
+import { isAllowedGpsOrigin } from './gps-origin-policy';
 
-@WebSocketGateway({ cors: true })
+@WebSocketGateway({
+  cors: { origin: (origin, callback) => callback(null, isAllowedGpsOrigin(origin)) },
+  // CORS alone does not restrict WebSocket upgrades.
+  allowRequest: (request, callback) => callback(null, isAllowedGpsOrigin(request.headers.origin)),
+})
 export class GpsGateway {
   @WebSocketServer() server: Server;
 
