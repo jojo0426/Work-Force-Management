@@ -17,8 +17,13 @@ const policy = {
 assert.equal(assessGatewayTransportRequest(request, policy), 'VALID');
 assert.equal(assessGatewayTransportRequest(request, { ...policy, stopped: true }), 'STOPPED');
 assert.equal(assessGatewayTransportRequest({ ...request, generation: 4n }, policy), 'STALE_GENERATION');
-assert.equal(assessGatewayTransportRequest({ ...request, destinationId: 'evil.example' }, policy),
+assert.equal(assessGatewayTransportRequest({ ...request, destinationId: 'untrusted-provider' }, policy),
   'UNTRUSTED_DESTINATION');
+for (const destinationId of ['evil.example', 'https://evil.example', 'localhost:8080',
+  '../synthetic-provider', '', 'ab', 'a'.repeat(81)]) {
+  assert.equal(assessGatewayTransportRequest({ ...request, destinationId }, policy),
+    'INVALID_REQUEST', `Malformed destination must be rejected: ${destinationId}`);
+}
 assert.equal(assessGatewayTransportRequest({ ...request, callerFingerprint: 'b'.repeat(64) }, policy),
   'UNTRUSTED_CALLER');
 assert.equal(assessGatewayTransportRequest({ ...request, requestId: 'short' }, policy),
