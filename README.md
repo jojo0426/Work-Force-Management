@@ -15,7 +15,7 @@ Current acceptance requirements and reproducible checks: [controlled beta valida
 
 ## Current Capabilities
 - **Backend:** NestJS + Prisma, PostgreSQL/PostGIS setup, ExcelJS-based Excel import, JWT authentication and role checks, work-order lifecycle enforcement, evidence handling, GPS and audit modules.
-- **Mobile:** Expo SDK 50 technician app with camera evidence, location support, local cache/offline queue, and server-authoritative work-order synchronization.
+- **Mobile:** Expo SDK 57 technician app with camera evidence, location support, local cache/offline queue, and server-authoritative work-order synchronization.
 - **Web:** Next.js 16 + Mapbox GL + Tailwind, authentication contract, and work-order import/assignment/dispatch workflows.
 - **Lifecycle reliability:** guarded Start, Field Issue, Evidence, and Finish mutations; reconciliation after management removal or status changes; stale local workflow invalidation; synchronization and management-race regression coverage.
 
@@ -94,7 +94,7 @@ The merged Phase 3 checkpoint records **WFM Baseline Validation #160: PASS**, in
 
 [WFM Baseline Validation](.github/workflows/baseline.yml) runs on pull requests targeting `main`, pushes to `main` and the listed phase branches, and manual dispatch. [Commit 47eeca27b0ac4ca01dea565b77ffc0a811d94cee](https://github.com/jojo0426/Work-Force-Management/commit/47eeca27b0ac4ca01dea565b77ffc0a811d94cee) added push validation for `main`.
 
-CI uses Node.js 24 and a clean PostgreSQL 16 database, validates the Prisma schema, and applies production migrations before database E2E checks. Backend and web production audits fail on high-severity findings. The mobile audit remains visible but non-blocking because Expo SDK 50 brings known build/CLI transitive dependency vulnerabilities; a passing workflow does not mean the mobile dependency audit is clean.
+CI uses Node.js 24 and a clean PostgreSQL 16 database, validates the Prisma schema, and applies production migrations before database E2E checks. Backend and web production audits fail on high-severity findings. The mobile audit blocks critical findings; high/moderate findings remain visible and require release disposition. A passing workflow does not mean the mobile dependency audit is clean.
 
 Passing these checks establishes the documented Phase 3 checkpoint. Mobile TypeScript validation is not a device/runtime test, and CI does not by itself establish live production deployment readiness.
 
@@ -126,8 +126,11 @@ npm audit --omit=dev --audit-level=high
 cd mobile
 npm install --no-fund
 npx tsc --noEmit
-npm audit --omit=dev --audit-level=high
-# CI reports the mobile audit without making it a blocking gate.
+npm run test:offline-queue
+EXPO_OFFLINE=1 npx expo install --check
+CI=1 EXPO_OFFLINE=1 npm run export:android
+npm audit --omit=dev --audit-level=critical
+# Critical findings block CI; unresolved high findings still block beta approval.
 ```
 
 ## Env Vars
@@ -143,7 +146,7 @@ See .env.example in each package.
 - [x] Backend build, web auth/build, and mobile TypeScript validation.
 - [x] Backend/web production dependency audit gates.
 - [x] Baseline validation on pushes to main.
-- [ ] Resolve mobile dependency audit findings through a planned Expo upgrade and runtime validation.
+- [ ] Resolve remaining mobile high/moderate dependency findings and complete SDK 57 device/runtime acceptance.
 - [ ] Complete the next implementation phase and deployment/device acceptance checks before declaring the full system production-ready.
 
 ## Next Phase Roadmap
@@ -153,3 +156,5 @@ Remaining readiness work includes mobile dependency modernization, device testin
 
 ---
 Built for FiberBlaze — Dasmariñas, PH
+
+Mobile upgrade scope and acceptance: [SDK 57 migration](docs/mobile-sdk57-migration.md).

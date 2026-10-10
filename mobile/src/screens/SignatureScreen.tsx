@@ -1,42 +1,36 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
+import { saveCustomerSignature } from '../services/api';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { WebView } from 'react-native-webview';
 
-export default function SignatureScreen({ workOrderId, executionId, onSave }: any) {
+export default function SignatureScreen({ workOrderId, executionId, token, onSave }: any) {
   const [signature, setSignature] = useState<string | null>(null);
 
   const saveSignature = async () => {
     if (!signature) { Alert.alert('Draw signature first'); return; }
     try {
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/phase4/signature`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workOrderId,
-          executionId,
-          signatureData: signature, // base64
-          signedByName: 'Customer',
-          signedByContact: '',
-          deviceInfo: { platform: 'mobile', timestamp: new Date().toISOString() }
-        })
+      if (!token) throw new Error('An authenticated technician session is required.');
+      const data = await saveCustomerSignature(token, {
+        workOrderId, executionId, signatureData: signature,
+        signedByName: 'Customer', signedByContact: '',
+        deviceInfo: { platform: 'mobile', timestamp: new Date().toISOString() }
       });
-      const data = await res.json();
+      if (!data?.signature?.isVerified) throw new Error('Server did not confirm the signature.');
       Alert.alert('Signature Saved', `Customer signed — verified. Audit logged.`);
       onSave && onSave(data);
     } catch (e) {
-      Alert.alert('Failed to save signature — will queue offline');
+      Alert.alert('Signature not saved', e instanceof Error ? e.message : 'Please retry.');
     }
   };
 
   return (
     <View style={s.container}>
       <Text style={s.title}>Customer Digital Signature — Phase 4</Text>
-      <Text style={s.sub}>Replaces hard-copy WO photo from beta. Customer acknowledges work completed.</Text>
+      <Text style={s.sub}>Signature capture requires device acceptance. Continue using signed hard-copy work orders for beta.</Text>
       <View style={{ backgroundColor: '#fff', height: 200, borderRadius: 12, marginVertical: 12, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ color: '#000' }}>✍️ Signature Pad (canvas) — draw here</Text>
         <Text style={{ color: '#71717A', fontSize: 10 }}>In production: use react-native-signature-canvas</Text>
       </View>
-      <TouchableOpacity style={s.btn} onPress={saveSignature}><Text style={s.btnText}>✓ Save Signature + Complete WO</Text></TouchableOpacity>
+      <TouchableOpacity style={s.btn} onPress={saveSignature}><Text style={s.btnText}>Save Signature</Text></TouchableOpacity>
       <Text style={{ color: '#71717A', fontSize: 10, marginTop: 8 }}>Evidence Chain: Photo (camera-only) + Measurements (structured) + Signature (digital) = Complete proof</Text>
     </View>
   );

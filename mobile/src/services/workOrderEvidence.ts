@@ -1,4 +1,4 @@
-import { Camera } from 'expo-camera';
+import { CameraView, Camera } from 'expo-camera';
 
 export type EvidenceType = 'WORK_RESULT'|'SPEEDTEST'|'FB_ISSUE'|'CUST_ISSUE'|'INSTALLATION'|'TRANSFER_REMOVAL'|'TRANSFER_INSTALL';
 export type WorkOrderType = 'REPAIR'|'INSTALLATION'|'TRANSFER';
@@ -14,7 +14,7 @@ export function getRequiredEvidenceTypes(workOrderType:WorkOrderType,finalStatus
 }
 export function getMissingEvidenceTypes(required:EvidenceType[],captured:EvidenceType[]){const set=new Set(captured);return required.filter(type=>!set.has(type));}
 export function requiresSpeedMeasurements(resultCode:ResultCode){return SPEED_RESULT_CODES.has(resultCode);}
-export async function captureWorkOrderEvidence(camera:Camera,type:EvidenceType):Promise<CapturedEvidence>{const permission=await Camera.requestCameraPermissionsAsync();if(!permission.granted)throw new Error('Camera permission is required to capture work-order evidence.');const photo=await camera.takePictureAsync({quality:0.8,skipProcessing:false});if(!photo?.uri)throw new Error('Camera capture did not produce a photo.');return{localUri:photo.uri,type,capturedAt:new Date().toISOString(),captureSource:'CAMERA'};}
+export async function captureWorkOrderEvidence(camera:CameraView,type:EvidenceType):Promise<CapturedEvidence>{const permission=await Camera.requestCameraPermissionsAsync();if(!permission.granted)throw new Error('Camera permission is required to capture work-order evidence.');const photo=await camera.takePictureAsync({quality:0.8,skipProcessing:false});if(!photo?.uri)throw new Error('Camera capture did not produce a photo.');return{localUri:photo.uri,type,capturedAt:new Date().toISOString(),captureSource:'CAMERA'};}
 
 export function buildEvidenceRegistrationPayload(evidence:CapturedEvidence,uploaded:{ticketId:string},gps?:{lat:number;lng:number}|null){
   if(!uploaded.ticketId.trim())throw new Error('Upload ticket ID is required.');

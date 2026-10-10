@@ -199,7 +199,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
 
   mobile:
-    name: Mobile TypeScript validation
+    name: Mobile build and security validation
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -210,6 +210,18 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - run: npm install --no-fund
-      - run: npx tsc --noEmit
-      - run: npm audit --omit=dev --audit-level=high || true
+      - run: npm ci --no-fund
+      - run: npm run typecheck
+      - run: npm run test:offline-queue
+      - run: npm run test:api
+      - name: Verify Expo SDK dependency compatibility
+        run: npx expo install --check
+        env:
+          EXPO_OFFLINE: '1'
+      - name: Build technician Android JavaScript bundle
+        run: npm run export:android
+        env:
+          CI: '1'
+          EXPO_OFFLINE: '1'
+      - name: Block critical mobile dependency vulnerabilities
+        run: npm audit --omit=dev --audit-level=critical

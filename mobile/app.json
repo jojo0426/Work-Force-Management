@@ -3,25 +3,36 @@
     "name": "FiberBlaze Tech",
     "slug": "fiberblaze-tech",
     "version": "1.0.0",
-    "permissions": [
-      "CAMERA",
-      "LOCATION",
-      "ACCESS_FINE_LOCATION",
-      "ACCESS_BACKGROUND_LOCATION"
-    ],
     "plugins": [
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow FiberBlaze to capture field evidence"
+          "cameraPermission": "Allow FiberBlaze to capture field evidence",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow FiberBlaze to track technician location for dispatch"
+          "locationWhenInUsePermission": "Allow FiberBlaze to use your location during field work",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
         }
       ]
-    ]
+    ],
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
+      ]
+    }
   }
 }

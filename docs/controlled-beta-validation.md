@@ -17,7 +17,7 @@ provider, deployment, or security acceptance from TypeScript/build success.
    Web auth/build/audit and mobile TypeScript must also succeed.
 4. Verify every required step executed. A skipped acceptance test is not a pass.
    Preserve the run URL, commit SHA, failing step/logs if any, and dependency audit output.
-5. The mobile audit is currently non-blocking. Record findings separately and resolve
+5. The mobile audit now blocks critical findings. Record high/moderate findings separately and resolve
    release-impacting vulnerabilities before approval; a green CI run does not certify mobile dependencies.
 
 Fast local checks (do not replace full database CI):
@@ -48,7 +48,7 @@ npm audit --omit=dev --audit-level=high
 | Evidence | Camera-only capture, private upload, expired tickets, completion evidence, speed-test capture, retry without duplicate submission | Device/storage acceptance pending |
 | Reports and KPIs | Daily/weekly/monthly totals, team/technician summaries, Excel export and print layout compared to seeded jobs | Operator acceptance pending |
 | Offline/mobile | Network loss during Start/upload/Finish, reconnect, app restart, stale assignment removal, denied permissions and logout | Physical-device evidence required |
-| Dependencies | Backend/web blocking audits and explicit mobile vulnerability disposition | Mobile modernization remains open |
+| Dependencies | Backend/web blocking audits and explicit mobile vulnerability disposition | SDK 57 migration implemented; high/moderate findings and device acceptance remain open |
 | Migration and recovery | Clean database migration and upgrade of a restored previous snapshot; measured backup restore | Environment acceptance pending |
 | External gateway | Non-bypassable egress, authenticated caller provenance, protected destination registry and credentials, provider fencing/idempotency | G1 OPEN; real providers disabled |
 | Gateway failure recovery | Database races, actual callback-entry SIGKILL, durable UNKNOWN, replay/rearm denial | Synthetic CI coverage only |

@@ -48,3 +48,10 @@ export async function updateMyLocation(token: string, lat: number, lng: number, 
 export async function endLocationSession(token: string) { return authenticated<any>(token, '/gps/location/offline', { method: 'POST' }); }
 export async function getSmartNext(token: string, lat: number, lng: number) { const query = `lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`; return authenticated<any>(token, `/work-orders/smart-next?${query}`); }
 export { API };
+
+export async function saveCustomerSignature(token: string, payload: Record<string, unknown>) {
+  if (!token.trim()) throw new Error('An authenticated technician session is required.');
+  const result = await authenticated<any>(token, '/phase4/signature', { method: 'POST', body: JSON.stringify(payload) });
+  if (result?.signature?.isVerified !== true) throw new Error('Server did not confirm the signature.');
+  return result;
+}
