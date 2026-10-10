@@ -1,4 +1,14 @@
-# FiberBlaze WFM — Phase 3 Dispatch and Technician Lifecycle
+# FiberBlaze WFM — Controlled Beta Development
+
+## Current Development Branch
+
+Active development: `wfm-phase-5e-sandbox-acceptance`. Phase 5E gateway work is an isolated synthetic prototype; **G1 remains OPEN and production remains NO-GO**. The Phase 3 merged checkpoint below is historical and does not describe all development-branch work.
+
+The CI #660 transport-policy failure was a rejection-category assertion mismatch. [Fix commit 6e7a7ad](https://github.com/jojo0426/Work-Force-Management/commit/6e7a7adc5d0bef27241cecaf41d31822fd2f7e7a) passed [baseline #661](https://github.com/jojo0426/Work-Force-Management/actions/runs/38049105185). Later changes require their own successful acceptance runs.
+
+Current acceptance requirements and reproducible checks: [controlled beta validation](docs/controlled-beta-validation.md). Gateway scope and open production gates: [Phase 5E.2AQ](docs/phase-5e2aq-gateway-trust-boundary.md). GPS socket security now rechecks token expiry, active account status and current roles before updates or sensitive live-location delivery; `npm run test:gps-session` covers stale authorization.
+
+## Merged Baseline
 
 **Status:** Phase 3 work-order dispatch and technician lifecycle completed and merged on October 1, 2026 ([PR #1](https://github.com/jojo0426/Work-Force-Management/pull/1)). This is a validated implementation checkpoint before the next WFM phase, not a declaration that the entire production system is final.
 **Repo:** jojo0426/Work-Force-Management

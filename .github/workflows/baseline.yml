@@ -58,6 +58,8 @@ jobs:
       - name: Run database-backed field exception lifecycle E2E
         run: npm run test:field-exception-database-e2e
       - run: npm run test:security
+      - name: Verify GPS socket session expiry and revocation
+        run: npm run test:gps-session
       - name: Run Phase 5C integration closure selftests
         run: npm run test:phase5c
       - name: Run Phase 5C integration database closure suite

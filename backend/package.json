@@ -6,6 +6,7 @@
         "start": "nest start",
         "start:dev": "nest start --watch",
         "test:auth": "ts-node src/auth/auth-selftest.ts",
+        "test:gps-session": "ts-node src/gps/gps-session-selftest.ts",
         "test:rbac": "ts-node src/auth/rbac-selftest.ts",
         "test:evidence-lifecycle": "ts-node src/work-orders/evidence-lifecycle-selftest.ts",
         "test:finish-gate": "ts-node src/work-orders/finish-gate-selftest.ts",
