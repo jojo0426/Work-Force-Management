@@ -58,6 +58,10 @@ jobs:
       - name: Run database-backed field exception lifecycle E2E
         run: npm run test:field-exception-database-e2e
       - run: npm run test:security
+      - name: Validate transfer mutation authorization
+        run: npm run test:transfer-authorization
+      - name: Validate transfer assignment and revocation in PostgreSQL
+        run: npm run test:transfer-authorization-database
       - name: Verify GPS socket session expiry and revocation
         run: npm run test:gps-session
       - name: Run Phase 5C integration closure selftests

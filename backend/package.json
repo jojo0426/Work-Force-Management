@@ -6,6 +6,8 @@
         "start": "nest start",
         "start:dev": "nest start --watch",
         "test:auth": "ts-node src/auth/auth-selftest.ts",
+        "test:transfer-authorization": "ts-node src/work-orders/transfer-authorization-selftest.ts",
+        "test:transfer-authorization-database": "ts-node src/work-orders/transfer-authorization-database-e2e.ts",
         "test:gps-session": "ts-node src/gps/gps-session-selftest.ts",
         "test:rbac": "ts-node src/auth/rbac-selftest.ts",
         "test:evidence-lifecycle": "ts-node src/work-orders/evidence-lifecycle-selftest.ts",

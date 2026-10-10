@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { Prisma, UserRole, WoStatus, WoType } from '@prisma/client';
 @Injectable()
 export class WorkOrdersPhase2Service {
   constructor(private prisma: PrismaService) {}
@@ -90,8 +91,61 @@ export class WorkOrdersPhase2Service {
   async reviewMismatch(mismatchId: string, decision: 'APPROVED'|'REJECTED', reviewedBy: string) {
     return this.prisma.mismatch.update({ where: { id: mismatchId }, data: { status: decision, reviewedBy, reviewedAt: new Date() } as any });
   }
-  async createTransfer(data: any) {
-    const transfer = await this.prisma.transfer.create({ data: { workOrderId: data.workOrderId, oldNapId: data.oldNapId, oldPort: data.oldPort, oldLat: data.oldLat, oldLng: data.oldLng, newNapId: data.newNapId, newPort: data.newPort, newLat: data.newLat, newLng: data.newLng } });
-    return { transfer, structure: { OLD_ADDRESS: { gps: { lat: data.oldLat, lng: data.oldLng }, nap: data.oldNapId, port: data.oldPort }, TRANSFER: 'TRANSFER', NEW_ADDRESS: { gps: { lat: data.newLat, lng: data.newLng }, nap: data.newNapId, port: data.newPort } }, note: 'Old history preserved' };
+  async createTransfer(data: any, actorId: string) {
+    if (!actorId || !data || typeof data.workOrderId !== 'string' || !data.workOrderId.trim()) {
+      throw new BadRequestException('Authenticated actor and work order are required');
+    }
+    const coordinates = (lat: unknown, lng: unknown, required: boolean) => {
+      if (!required && lat == null && lng == null) return;
+      if (typeof lat !== 'number' || typeof lng !== 'number' ||
+          !Number.isFinite(lat) || !Number.isFinite(lng) ||
+          lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        throw new BadRequestException('Valid transfer GPS coordinates are required');
+      }
+    };
+    coordinates(data.oldLat, data.oldLng, false);
+    coordinates(data.newLat, data.newLng, true);
+    if (typeof data.newNapId !== 'string' || !data.newNapId.trim() ||
+        !Number.isInteger(data.newPort) || data.newPort < 1 ||
+        (data.oldPort != null && (!Number.isInteger(data.oldPort) || data.oldPort < 1))) {
+      throw new BadRequestException('Valid destination NAP and port are required');
+    }
+    return this.prisma.$transaction(async tx => {
+      const actor = await tx.user.findUnique({ where: { id: actorId } });
+      if (!actor?.isActive) throw new ForbiddenException('Active account required');
+      const wo = await tx.workOrder.findUnique({ where: { id: data.workOrderId }, include: { assignments: true } });
+      if (!wo || wo.type !== WoType.TRANSFER) throw new BadRequestException('Transfer work order required');
+      if (![WoStatus.DRAFT, WoStatus.ASSIGNED, WoStatus.WORKING].includes(wo.status as any)) {
+        throw new BadRequestException('Transfer work order is no longer editable');
+      }
+      if (actor.role === UserRole.TECHNICIAN) {
+        if (!actor.teamId || !wo.assignments.some(assignment => assignment.teamId === actor.teamId) ||
+            wo.status !== WoStatus.WORKING ||
+            !await tx.jobExecution.findFirst({ where: { workOrderId: wo.id, technicianId: actor.id, completedAt: null } })) {
+          throw new ForbiddenException('Assigned active transfer execution required');
+        }
+      } else if (![UserRole.JOB_CONTROLLER, UserRole.SUPERVISOR, UserRole.ADMINISTRATOR].includes(actor.role as any)) {
+        throw new ForbiddenException('Transfer management role required');
+      }
+      const nap = await tx.nap.findUnique({ where: { id: data.newNapId } });
+      if (!nap || data.newPort > nap.portCount) throw new BadRequestException('Invalid destination NAP port');
+      if (data.oldNapId != null) {
+        if (typeof data.oldNapId !== 'string' || !data.oldNapId.trim()) throw new BadRequestException('Invalid old NAP');
+        const oldNap = await tx.nap.findUnique({ where: { id: data.oldNapId } });
+        if (!oldNap || (data.oldPort != null && data.oldPort > oldNap.portCount)) throw new BadRequestException('Invalid old NAP port');
+      }
+      const transfer = await tx.transfer.create({ data: {
+        workOrderId: wo.id, oldNapId: data.oldNapId, oldPort: data.oldPort,
+        oldLat: data.oldLat, oldLng: data.oldLng, newNapId: data.newNapId,
+        newPort: data.newPort, newLat: data.newLat, newLng: data.newLng,
+      } });
+      await tx.auditLog.create({ data: { workOrderId: wo.id, actorId: actor.id,
+        action: 'TRANSFER_RECORDED', details: { transferId: transfer.id, assignmentChecked: actor.role === UserRole.TECHNICIAN } } });
+      return { transfer, structure: {
+        OLD_ADDRESS: { gps: { lat: data.oldLat, lng: data.oldLng }, nap: data.oldNapId, port: data.oldPort },
+        TRANSFER: 'TRANSFER',
+        NEW_ADDRESS: { gps: { lat: data.newLat, lng: data.newLng }, nap: data.newNapId, port: data.newPort },
+      }, note: 'Old history preserved' };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }

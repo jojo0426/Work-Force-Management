@@ -33,7 +33,17 @@ function main(): void {
     ok('CI gates Phase 5C database safety', workflow.includes('npm run test:phase5c-database'));
     ok('CI gates Phase 5D activation and monitoring', workflow.includes('npm run test:phase5d-activation') && workflow.includes('npm run test:phase5d-monitoring-wiring'));
     ok('CI gates backend and web production audits', (workflow.match(/npm audit --omit=dev --audit-level=high/g) || []).length >= 2);
-    ok('mobile audit is explicitly non-blocking', workflow.includes('npm audit --omit=dev --audit-level=high || true'));
+    const mobileWorkflow = workflow.slice(workflow.indexOf('\n  mobile:'));
+    ok('mobile critical audit is blocking without suppression',
+      mobileWorkflow.includes('run: npm audit --omit=dev --audit-level=critical') &&
+      !mobileWorkflow.includes('|| true') && !mobileWorkflow.includes('continue-on-error'));
+    ok('mobile SDK and bundle acceptance are gated',
+      mobileWorkflow.includes('npm ci --no-fund') &&
+      mobileWorkflow.includes('npm run typecheck') &&
+      mobileWorkflow.includes('npm run test:offline-queue') &&
+      mobileWorkflow.includes('npm run test:api') &&
+      mobileWorkflow.includes('npx expo install --check') &&
+      mobileWorkflow.includes('npm run export:android'));
     const runbook = readFileSync(join(__dirname, '../../../docs/phase-5d4-activation-recovery-runbook.md'), 'utf8');
     ok('rollback runbook documents emergency stop', runbook.includes('emergencyStop()') && runbook.includes('INTEGRATION_EXECUTION_ENABLED=false'));
     const acceptance = readFileSync(join(__dirname, '../../../docs/phase-5d5-release-acceptance.md'), 'utf8');
