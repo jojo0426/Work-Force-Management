@@ -6,6 +6,8 @@
 - Added `integration-gateway-transport-policy.ts`: a pure, fail-closed request policy for an eventual dedicated gateway. Requests carry requestId, bigint fencing generation, a logical destination ID, payload SHA256 digest, and a caller fingerprint.
 - The policy rejects STOP, stale generations, malformed requests, unknown destination IDs, and untrusted caller fingerprints. The caller fingerprint comparison is constant-time for well-formed hex digests. Destination IDs are NOT worker-supplied URLs.
 - Added negative tests for each rejection and a compile-time disabled live provider egress constant. CI runs the tests.
+- Corrected the CI #660 destination assertion: malformed URL/hostname input is `INVALID_REQUEST`; a syntactically valid destination ID outside the allowlist is `UNTRUSTED_DESTINATION`. Both remain denied.
+- Runtime policy validation rejects missing/non-boolean STOP, invalid generations, malformed allowlists and malformed fingerprint inventories before admission. Empty trust lists deny requests. This guards runtime configuration despite TypeScript declarations; it does not authenticate caller identity.
 - Existing Phase 5E.2AP synthetic PostgreSQL send boundary and unknown-outcome handling remain intact.
 
 ## Not yet established

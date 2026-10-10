@@ -31,5 +31,34 @@ assert.equal(assessGatewayTransportRequest({ ...request, requestId: 'short' }, p
 assert.equal(assessGatewayTransportRequest({ ...request, payloadDigest: 'bad' }, policy),
   'INVALID_REQUEST');
 assert.equal(PHASE5E2AQ_LIVE_PROVIDER_EGRESS_ENABLED, false);
+// Deliberate type bypass models malformed runtime input/configuration.
+for (const patch of [
+  { stopped: undefined }, { stopped: 'false' }, { stopped: 0 },
+  { generation: '5' }, { generation: -1n },
+  { allowedDestinationIds: undefined }, { allowedDestinationIds: 'synthetic-provider' },
+  { allowedDestinationIds: [null] }, { allowedDestinationIds: ['https://evil.example'] },
+  { trustedCallerFingerprints: undefined }, { trustedCallerFingerprints: trusted },
+  { trustedCallerFingerprints: [trusted, 'bad'] },
+]) {
+  assert.equal(assessGatewayTransportRequest(request, { ...policy, ...patch } as any),
+    'INVALID_REQUEST');
+}
+for (const patch of [
+  { requestId: 1234567890123456 }, { generation: '5' }, { generation: -1n },
+  { destinationId: 123 }, { payloadDigest: null }, { callerFingerprint: null },
+  { callerFingerprint: 'A'.repeat(64) },
+]) {
+  assert.equal(assessGatewayTransportRequest({ ...request, ...patch } as any, policy),
+    'INVALID_REQUEST');
+}
+assert.equal(assessGatewayTransportRequest(request, { ...policy, allowedDestinationIds: [] }),
+  'UNTRUSTED_DESTINATION');
+assert.equal(assessGatewayTransportRequest(request, { ...policy, trustedCallerFingerprints: [] }),
+  'UNTRUSTED_CALLER');
+assert.equal(assessGatewayTransportRequest(null as any, policy), 'INVALID_REQUEST');
+assert.equal(assessGatewayTransportRequest(request, null as any), 'INVALID_REQUEST');
+assert.equal(assessGatewayTransportRequest({ ...request, generation: 4n },
+  { ...policy, stopped: true }), 'STOPPED');
 console.log('PASS: synthetic gateway transport policy denies STOP, stale epochs, untrusted callers/destinations');
+console.log('PASS: malformed runtime policy and requests fail closed; empty trust lists deny admission');
 console.log('PASS: no live provider egress available');

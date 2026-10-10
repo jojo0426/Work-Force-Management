@@ -23,8 +23,12 @@ export interface GatewayTransportPolicy {
   readonly trustedCallerFingerprints: readonly string[];
 }
 
-const isHexDigest = (value: string): boolean => /^[a-f0-9]{64}$/.test(value);
-const isId = (value: string): boolean => /^[A-Za-z0-9_-]{16,100}$/.test(value);
+const isHexDigest = (value: unknown): value is string =>
+  typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+const isId = (value: unknown): value is string =>
+  typeof value === 'string' && /^[A-Za-z0-9_-]{16,100}$/.test(value);
+const isDestinationId = (value: unknown): value is string =>
+  typeof value === 'string' && /^[A-Za-z0-9_-]{3,80}$/.test(value);
 
 /**
  * IDs only, not URLs: a worker cannot supply arbitrary hostnames, ports,
@@ -34,10 +38,18 @@ const isId = (value: string): boolean => /^[A-Za-z0-9_-]{16,100}$/.test(value);
 export function assessGatewayTransportRequest(
   request: GatewayTransportRequest, policy: GatewayTransportPolicy,
 ): GatewayTransportDecision {
+  // TypeScript types do not validate decoded input or deployment configuration.
+  // Reject incomplete policy rather than interpreting missing STOP as permission.
   if (!request || !policy ||
+      typeof policy.stopped !== 'boolean' ||
+      typeof policy.generation !== 'bigint' || policy.generation < 0n ||
+      !Array.isArray(policy.allowedDestinationIds) ||
+      !policy.allowedDestinationIds.every(isDestinationId) ||
+      !Array.isArray(policy.trustedCallerFingerprints) ||
+      !policy.trustedCallerFingerprints.every(isHexDigest) ||
       !isId(request.requestId) ||
       typeof request.generation !== 'bigint' || request.generation < 0n ||
-      !/^[A-Za-z0-9_-]{3,80}$/.test(request.destinationId) ||
+      !isDestinationId(request.destinationId) ||
       !isHexDigest(request.payloadDigest) ||
       !isHexDigest(request.callerFingerprint)) return 'INVALID_REQUEST';
   if (policy.stopped) return 'STOPPED';
