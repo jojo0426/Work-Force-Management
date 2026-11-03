@@ -143,6 +143,9 @@
     "overrides": {
         "@andreeewill/exceljs": {
             "archiver": "8.0.0"
+        },
+        "readdir-glob": {
+            "minimatch": "11.0.1"
         }
     }
 }
