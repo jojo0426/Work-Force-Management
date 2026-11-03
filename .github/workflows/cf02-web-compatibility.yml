@@ -1,0 +1,51 @@
+name: CF-02 WFM web compatibility (manual only)
+
+# Intentionally manual: no push/PR trigger, no Cloudflare deployment or credentials.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cf02-web-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  web-compatibility:
+    if: github.ref == 'refs/heads/engineering/cf-01-cloudflare-readiness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout isolated readiness branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Validate cloud API origin fail-closed behavior
+        run: node --test scripts/cloud-config.test.cjs
+      - name: Validate existing web auth and operations contracts
+        run: npm run test:auth-contract
+      - name: Verify existing local-mode Next.js build
+        run: npm run build
+      - name: Verify cloud mode rejects missing API origin
+        shell: bash
+        run: |
+          set +e
+          output=$(WFM_CLOUD_DEPLOYMENT=true node -e "require('./next.config.js')" 2>&1)
+          result=$?
+          set -e
+          if [ "$result" -eq 0 ]; then
+            echo "FAIL: cloud mode accepted missing API origin"
+            exit 1
+          fi
+          echo "$output" | grep -q 'WFM_API_ORIGIN is required'
+          echo "PASS: missing cloud API origin rejected"
