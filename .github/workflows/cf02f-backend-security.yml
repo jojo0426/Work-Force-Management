@@ -1,0 +1,52 @@
+name: CF-02F WFM Backend Security Admission
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cf02f-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backend-security:
+    if: github.ref == 'refs/heads/engineering/cf-02f-independent-ci-admission'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Clean dependency installation
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/wfm_ci
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Verify Excel compatibility
+        run: npm run test:excel-compatibility
+
+      - name: Run reporting regression
+        run: npm run test:reports-regression
